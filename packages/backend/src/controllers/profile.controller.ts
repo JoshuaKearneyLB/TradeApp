@@ -68,7 +68,7 @@ export async function updateProfile(req: AuthRequest, res: Response): Promise<vo
 export async function updateProfessionalProfile(req: AuthRequest, res: Response): Promise<void> {
   try {
     const userId = req.user!.userId;
-    const { bio, hourlyRate, availabilityRadiusKm, isAvailable, location } = req.body;
+    const { bio, hourlyRate, availabilityRadiusKm, isAvailable, location, locationDisplay } = req.body;
 
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -82,8 +82,11 @@ export async function updateProfessionalProfile(req: AuthRequest, res: Response)
       if (location && location.latitude && location.longitude) {
         sets.push(`location = ST_SetSRID(ST_MakePoint($${idx++}, $${idx++}), 4326)::geography`);
         params.push(location.longitude, location.latitude);
+        sets.push(`location_display = $${idx++}`);
+        params.push(locationDisplay || null);
       } else {
         sets.push(`location = NULL`);
+        sets.push(`location_display = NULL`);
       }
     }
 
@@ -98,7 +101,7 @@ export async function updateProfessionalProfile(req: AuthRequest, res: Response)
       `UPDATE professional_profiles SET ${sets.join(', ')}
        WHERE user_id = $${idx}
        RETURNING id, user_id, bio, hourly_rate, availability_radius_km, is_available, average_rating, total_jobs_completed,
-         ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+         ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude, location_display,
          created_at, updated_at`,
       params
     );
@@ -119,7 +122,7 @@ export async function updateProfessionalProfile(req: AuthRequest, res: Response)
       averageRating: parseFloat(p.average_rating),
       totalJobsCompleted: p.total_jobs_completed,
       location: p.latitude && p.longitude
-        ? { latitude: parseFloat(p.latitude), longitude: parseFloat(p.longitude) }
+        ? { latitude: parseFloat(p.latitude), longitude: parseFloat(p.longitude), display: p.location_display || undefined }
         : null,
       createdAt: p.created_at,
       updatedAt: p.updated_at,

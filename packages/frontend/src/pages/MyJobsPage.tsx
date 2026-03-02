@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { NotificationBell } from '../components/NotificationBell';
 import { jobService } from '../services/jobService';
 import type { JobResponse } from '../services/jobService';
 import { UserRole } from '@tradeapp/shared';
@@ -85,6 +86,7 @@ export function MyJobsPage() {
               <Link to="/jobs" className="btn btn-outline">Browse Jobs</Link>
             )}
             <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
+            <NotificationBell />
             <button className="btn btn-outline" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../services/authService';
+import { socketService } from '../services/socketService';
 import type { User, ProfessionalProfile, RegisterRequest, LoginRequest } from '@tradeapp/shared';
 
 interface AuthContextType {
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const response = await authService.getMe();
           setUser(response.user);
           setProfessionalProfile(response.professionalProfile || null);
+          socketService.connect(storedToken);
         } catch (error) {
           console.error('Failed to fetch user:', error);
           localStorage.removeItem('token');
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(response.token);
       setUser(response.user);
       setProfessionalProfile(response.professionalProfile || null);
+      socketService.connect(response.token);
     } catch (error) {
       throw error;
     }
@@ -61,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(response.token);
       setUser(response.user);
       setProfessionalProfile(response.professionalProfile || null);
+      socketService.connect(response.token);
     } catch (error) {
       throw error;
     }
@@ -68,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     authService.logout();
+    socketService.disconnect();
     setToken(null);
     setUser(null);
     setProfessionalProfile(null);

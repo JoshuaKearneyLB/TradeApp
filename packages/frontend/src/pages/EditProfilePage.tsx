@@ -23,21 +23,24 @@ export function EditProfilePage() {
   // Basic profile fields
   const [basic, setBasic] = useState({ firstName: '', lastName: '', phone: '' });
 
-  // Professional fields
+  // Professional fields (no location here — stored separately below)
   const [pro, setPro] = useState({
     bio: '',
     hourlyRate: '',
     availabilityRadiusKm: '20',
     isAvailable: true,
-    locationLat: '',
-    locationLng: '',
   });
+
+  // Location state: geocodedLocation holds the saved coords; locationDisplay is the human-readable label;
+  // locationAddress is only the live search input (always starts empty)
+  const [locationAddress, setLocationAddress] = useState('');
+  const [locationDisplay, setLocationDisplay] = useState('');
+  const [geocodedLocation, setGeocodedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Skills
   const [skills, setSkills] = useState<Skill[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  const [locationAddress, setLocationAddress] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
@@ -60,9 +63,17 @@ export function EditProfilePage() {
         hourlyRate: professionalProfile.hourlyRate ? String(professionalProfile.hourlyRate) : '',
         availabilityRadiusKm: String(professionalProfile.availabilityRadiusKm),
         isAvailable: professionalProfile.isAvailable,
-        locationLat: professionalProfile.location?.latitude ? String(professionalProfile.location.latitude) : '',
-        locationLng: professionalProfile.location?.longitude ? String(professionalProfile.location.longitude) : '',
       });
+      if (professionalProfile.location?.latitude && professionalProfile.location?.longitude) {
+        setGeocodedLocation({
+          latitude: professionalProfile.location.latitude,
+          longitude: professionalProfile.location.longitude,
+        });
+        setLocationDisplay(
+          professionalProfile.location.display ||
+          `${professionalProfile.location.latitude.toFixed(4)}, ${professionalProfile.location.longitude.toFixed(4)}`
+        );
+      }
     }
   }, [user, professionalProfile]);
 
@@ -82,13 +93,20 @@ export function EditProfilePage() {
     setPro({ ...pro, [e.target.name]: e.target.value });
   };
 
+  const handleAddressChange = (value: string) => {
+    setLocationAddress(value);
+  };
+
   const handleLocationSelect = (suggestion: GeocodeSuggestion) => {
-    setLocationAddress(suggestion.shortName);
-    setPro((prev) => ({
-      ...prev,
-      locationLat: String(suggestion.latitude),
-      locationLng: String(suggestion.longitude),
-    }));
+    setLocationAddress('');
+    setLocationDisplay(suggestion.shortName);
+    setGeocodedLocation({ latitude: suggestion.latitude, longitude: suggestion.longitude });
+  };
+
+  const handleLocationClear = () => {
+    setGeocodedLocation(null);
+    setLocationDisplay('');
+    setLocationAddress('');
   };
 
   // Skills helpers
@@ -130,9 +148,8 @@ export function EditProfilePage() {
           hourlyRate: pro.hourlyRate ? Number(pro.hourlyRate) : null,
           availabilityRadiusKm: Number(pro.availabilityRadiusKm),
           isAvailable: pro.isAvailable,
-          location: pro.locationLat && pro.locationLng
-            ? { latitude: Number(pro.locationLat), longitude: Number(pro.locationLng) }
-            : null,
+          location: geocodedLocation ?? null,
+          locationDisplay: geocodedLocation ? locationDisplay : null,
         });
 
         // 3. Save skills
@@ -247,17 +264,36 @@ export function EditProfilePage() {
 
                 <div className="form-group">
                   <label className="form-label">Your location</label>
+
+                  {/* Saved location chip */}
+                  {geocodedLocation && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '8px 12px', marginBottom: '8px',
+                      borderRadius: '6px', backgroundColor: '#f0fdf4',
+                      border: '1px solid #86efac',
+                    }}>
+                      <span style={{ fontSize: '0.875rem', flex: 1, color: '#166534' }}>
+                        📍 {locationDisplay}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleLocationClear}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#166534', fontSize: '1.1rem', lineHeight: 1, padding: '0 2px' }}
+                        title="Remove location"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
                   <AddressAutocomplete
                     value={locationAddress}
-                    onChange={(v) => { setLocationAddress(v); setPro((p) => ({ ...p, locationLat: '', locationLng: '' })); }}
+                    onChange={handleAddressChange}
                     onSelect={handleLocationSelect}
-                    placeholder="Start typing your base address or postcode…"
+                    placeholder={geocodedLocation ? 'Search to change location…' : 'Start typing your base address or postcode…'}
                   />
-                  {pro.locationLat && pro.locationLng ? (
-                    <p className="text-xs text-muted" style={{ marginTop: '4px' }}>
-                      Set: {parseFloat(pro.locationLat).toFixed(5)}, {parseFloat(pro.locationLng).toFixed(5)}
-                    </p>
-                  ) : (
+                  {!geocodedLocation && (
                     <p className="text-xs text-light" style={{ marginTop: '4px' }}>
                       Used for location-based job matching. Select an address from the dropdown.
                     </p>

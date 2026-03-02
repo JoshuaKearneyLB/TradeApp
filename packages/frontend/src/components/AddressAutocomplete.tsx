@@ -49,11 +49,11 @@ export function AddressAutocomplete({
   }, []);
 
   useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
     if (skipFetch.current) {
       skipFetch.current = false;
       return;
     }
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => fetchSuggestions(value), 350);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);

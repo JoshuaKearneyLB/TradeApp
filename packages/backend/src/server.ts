@@ -5,13 +5,16 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 import { testConnection } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import jobsRoutes from './routes/jobs.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import ratingsRoutes from './routes/ratings.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { initIO } from './socket/index.js';
 import type { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData } from '@tradeapp/shared';
 
 // Load environment variables
@@ -31,6 +34,9 @@ const io = new SocketIOServer<
     credentials: true,
   },
 });
+
+// Register io before any routes load (breaks circular dependency)
+initIO(io);
 
 const PORT = process.env.PORT || 3000;
 
@@ -62,6 +68,7 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/ratings', ratingsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // Geocoding endpoint — proxies to Nominatim so frontend avoids CORS
 app.get('/api/geocode', async (req, res) => {
@@ -126,8 +133,18 @@ io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
   socket.on('authenticate', (token: string) => {
-    // TODO: Verify JWT token and join user-specific room
-    console.log('Socket authentication requested');
+    try {
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) throw new Error('JWT_SECRET not configured');
+      const payload = jwt.verify(token, jwtSecret) as { userId: string };
+      socket.data.userId = payload.userId;
+      socket.join(`user:${payload.userId}`);
+      socket.emit('authenticated', { success: true, userId: payload.userId });
+      console.log(`Socket authenticated for user: ${payload.userId}`);
+    } catch {
+      socket.emit('authenticated', { success: false });
+      socket.disconnect();
+    }
   });
 
   socket.on('disconnect', () => {
@@ -185,4 +202,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-export { app, io };
+export { app };

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { NotificationBell } from '../components/NotificationBell';
 import { jobService } from '../services/jobService';
 import type { Category } from '../services/jobService';
 import type { GeocodeSuggestion } from '../services/geocodeService';
@@ -75,6 +76,7 @@ export function PostJobPage() {
           <div className="navbar-actions">
             <Link to="/my-jobs" className="btn btn-outline">My Jobs</Link>
             <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
+            <NotificationBell />
             <button className="btn btn-outline" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
           </div>
         </div>

@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { query } from '../config/database.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { getIO } from '../socket/index.js';
+import { NotificationType } from '@tradeapp/shared';
 
 export async function createJob(req: AuthRequest, res: Response): Promise<void> {
   try {
@@ -215,7 +217,42 @@ export async function acceptJob(req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    res.json(formatJob(result.rows[0]));
+    const acceptedJob = result.rows[0];
+
+    // Fetch professional's name for the notification message
+    const proResult = await query(
+      'SELECT first_name, last_name FROM users WHERE id = $1',
+      [userId]
+    );
+    const pro = proResult.rows[0];
+    const proName = pro ? `${pro.first_name} ${pro.last_name}` : 'A professional';
+
+    // Insert notification record for the customer
+    const notifResult = await query(
+      `INSERT INTO notifications (user_id, type, title, content, related_job_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, created_at`,
+      [
+        job.customer_id,
+        NotificationType.JOB_ACCEPTED,
+        'Job accepted',
+        `${proName} has accepted your job: ${job.title}`,
+        id,
+      ]
+    );
+
+    // Emit real-time notification to the customer's socket room
+    const notif = notifResult.rows[0];
+    getIO().to(`user:${job.customer_id}`).emit('new_notification', {
+      notificationId: notif.id,
+      type: NotificationType.JOB_ACCEPTED,
+      title: 'Job accepted',
+      content: `${proName} has accepted your job: ${job.title}`,
+      relatedJobId: id,
+      createdAt: notif.created_at.toISOString(),
+    });
+
+    res.json(formatJob(acceptedJob));
   } catch (error) {
     console.error('Accept job error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -271,6 +308,40 @@ export async function updateJobStatus(req: AuthRequest, res: Response): Promise<
         `UPDATE professional_profiles SET total_jobs_completed = total_jobs_completed + 1 WHERE user_id = $1`,
         [job.professional_id]
       );
+    }
+
+    // Notify customer when job starts or completes
+    if ((status === 'in_progress' || status === 'completed') && job.professional_id) {
+      const proResult = await query(
+        'SELECT first_name, last_name FROM users WHERE id = $1',
+        [job.professional_id]
+      );
+      const pro = proResult.rows[0];
+      const proName = pro ? `${pro.first_name} ${pro.last_name}` : 'Your professional';
+
+      const isStarted = status === 'in_progress';
+      const notifType = isStarted ? NotificationType.JOB_STARTED : NotificationType.JOB_COMPLETED;
+      const notifTitle = isStarted ? 'Job started' : 'Job completed';
+      const notifContent = isStarted
+        ? `${proName} has started work on your job: ${job.title}`
+        : `${proName} has marked your job as complete: ${job.title}`;
+
+      const notifResult = await query(
+        `INSERT INTO notifications (user_id, type, title, content, related_job_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, created_at`,
+        [job.customer_id, notifType, notifTitle, notifContent, id]
+      );
+
+      const notif = notifResult.rows[0];
+      getIO().to(`user:${job.customer_id}`).emit('new_notification', {
+        notificationId: notif.id,
+        type: notifType,
+        title: notifTitle,
+        content: notifContent,
+        relatedJobId: id,
+        createdAt: notif.created_at.toISOString(),
+      });
     }
 
     res.json(formatJob(result.rows[0]));

@@ -154,6 +154,7 @@ export async function login(req: Request, res: Response): Promise<void> {
         `SELECT id, user_id, bio, hourly_rate, availability_radius_km,
                 ST_Y(location::geometry) as latitude,
                 ST_X(location::geometry) as longitude,
+                location_display,
                 is_available, average_rating, total_jobs_completed, created_at, updated_at
          FROM professional_profiles
          WHERE user_id = $1`,
@@ -169,7 +170,7 @@ export async function login(req: Request, res: Response): Promise<void> {
           hourlyRate: profile.hourly_rate ? parseFloat(profile.hourly_rate) : undefined,
           availabilityRadiusKm: profile.availability_radius_km,
           location: profile.latitude && profile.longitude
-            ? { latitude: parseFloat(profile.latitude), longitude: parseFloat(profile.longitude) }
+            ? { latitude: parseFloat(profile.latitude), longitude: parseFloat(profile.longitude), display: profile.location_display || undefined }
             : undefined,
           isAvailable: profile.is_available,
           averageRating: parseFloat(profile.average_rating),
@@ -242,6 +243,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
         `SELECT id, user_id, bio, hourly_rate, availability_radius_km,
                 ST_Y(location::geometry) as latitude,
                 ST_X(location::geometry) as longitude,
+                location_display,
                 is_available, average_rating, total_jobs_completed, created_at, updated_at
          FROM professional_profiles
          WHERE user_id = $1`,
@@ -257,7 +259,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
           hourlyRate: profile.hourly_rate ? parseFloat(profile.hourly_rate) : undefined,
           availabilityRadiusKm: profile.availability_radius_km,
           location: profile.latitude && profile.longitude
-            ? { latitude: parseFloat(profile.latitude), longitude: parseFloat(profile.longitude) }
+            ? { latitude: parseFloat(profile.latitude), longitude: parseFloat(profile.longitude), display: profile.location_display || undefined }
             : undefined,
           isAvailable: profile.is_available,
           averageRating: parseFloat(profile.average_rating),

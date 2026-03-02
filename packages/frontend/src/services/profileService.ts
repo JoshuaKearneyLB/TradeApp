@@ -19,6 +19,7 @@ export const profileService = {
     availabilityRadiusKm?: number;
     isAvailable?: boolean;
     location?: { latitude: number; longitude: number } | null;
+    locationDisplay?: string | null;
   }) {
     const res = await api.put('/profile/professional', data);
     return res.data;

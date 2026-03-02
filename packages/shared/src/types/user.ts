@@ -30,6 +30,7 @@ export interface ProfessionalProfile {
   location?: {
     latitude: number;
     longitude: number;
+    display?: string;
   };
   isAvailable: boolean;
   averageRating: number;

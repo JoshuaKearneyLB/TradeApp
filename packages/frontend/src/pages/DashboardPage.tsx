@@ -1,6 +1,7 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '@tradeapp/shared';
+import { NotificationBell } from '../components/NotificationBell';
 
 export function DashboardPage() {
   const { user, professionalProfile, logout } = useAuth();
@@ -25,6 +26,7 @@ export function DashboardPage() {
               <Link to="/jobs" className="btn btn-primary">Browse Jobs</Link>
             )}
             <Link to="/edit-profile" className="btn btn-outline">Edit Profile</Link>
+            <NotificationBell />
             <button className="btn btn-outline" onClick={handleLogout}>Logout</button>
           </div>
         </div>
@@ -84,6 +86,17 @@ export function DashboardPage() {
                   <div className="text-sm">${professionalProfile.hourlyRate}/hr</div>
                 </div>
               )}
+              <div>
+                <div className="text-xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Base location</div>
+                <div className="text-sm">
+                  {professionalProfile.location?.display
+                    ? `📍 ${professionalProfile.location.display}`
+                    : professionalProfile.location
+                      ? `📍 ${professionalProfile.location.latitude.toFixed(4)}, ${professionalProfile.location.longitude.toFixed(4)}`
+                      : <span className="text-light">Not set — <a href="/edit-profile" style={{ color: 'inherit' }}>add in Edit Profile</a></span>
+                  }
+                </div>
+              </div>
             </div>
           </div>
         )}

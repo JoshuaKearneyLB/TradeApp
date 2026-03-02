@@ -1,6 +1,7 @@
 export enum NotificationType {
   NEW_JOB = 'new_job',
   JOB_ACCEPTED = 'job_accepted',
+  JOB_STARTED = 'job_started',
   JOB_COMPLETED = 'job_completed',
   MESSAGE = 'message',
   RATING = 'rating',
