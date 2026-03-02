@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes.js';
 import jobsRoutes from './routes/jobs.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+import ratingsRoutes from './routes/ratings.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import type { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData } from '@tradeapp/shared';
 
@@ -60,6 +61,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/ratings', ratingsRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

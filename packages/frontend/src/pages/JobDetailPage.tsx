@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jobService } from '../services/jobService';
 import type { JobResponse } from '../services/jobService';
+import { ratingService } from '../services/ratingService';
+import type { RatingResponse } from '../services/ratingService';
 import { UserRole } from '@tradeapp/shared';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -27,12 +29,20 @@ export function JobDetailPage() {
   const [job, setJob] = useState<JobResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [existingRating, setExistingRating] = useState<RatingResponse | null>(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingLoading, setRatingLoading] = useState(false);
 
   const fetchJob = async () => {
     if (!id) return;
     try {
       const data = await jobService.getJobById(id);
       setJob(data);
+      if (data.status === 'completed') {
+        const { rating } = await ratingService.getJobRating(id);
+        setExistingRating(rating);
+      }
     } catch (error) {
       console.error('Failed to load job:', error);
     } finally {
@@ -41,6 +51,20 @@ export function JobDetailPage() {
   };
 
   useEffect(() => { fetchJob(); }, [id]);
+
+  const handleSubmitRating = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || ratingValue === 0) return;
+    setRatingLoading(true);
+    try {
+      const created = await ratingService.createRating({ jobId: id, rating: ratingValue, comment: ratingComment || undefined });
+      setExistingRating(created);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to submit rating');
+    } finally {
+      setRatingLoading(false);
+    }
+  };
 
   const handleAccept = async () => {
     if (!id) return;
@@ -179,6 +203,60 @@ export function JobDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Rating section */}
+            {job.status === 'completed' && (
+              <div className="card mt-2">
+                {isOwner && !existingRating && (
+                  <>
+                    <h3>Rate this Job</h3>
+                    <p className="text-muted text-sm">How did {job.professional?.firstName} do?</p>
+                    <form onSubmit={handleSubmitRating}>
+                      <div className="flex gap-1" style={{ fontSize: '28px', marginBottom: '12px', cursor: 'pointer' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            onClick={() => setRatingValue(star)}
+                            style={{ color: star <= ratingValue ? '#f59e0b' : '#d1d5db', userSelect: 'none' }}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <textarea
+                        className="form-input"
+                        placeholder="Leave a comment (optional)"
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        rows={3}
+                        style={{ marginBottom: '12px' }}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={ratingValue === 0 || ratingLoading}
+                      >
+                        {ratingLoading ? 'Submitting...' : 'Submit Rating'}
+                      </button>
+                    </form>
+                  </>
+                )}
+                {existingRating && (
+                  <>
+                    <h3>{isOwner ? 'Your Rating' : 'Customer Rating'}</h3>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span key={star} style={{ color: star <= existingRating.rating ? '#f59e0b' : '#d1d5db' }}>★</span>
+                      ))}
+                      <span className="text-muted text-sm" style={{ marginLeft: '8px' }}>{existingRating.rating}/5</span>
+                    </div>
+                    {existingRating.comment && (
+                      <p className="text-sm" style={{ margin: 0 }}>{existingRating.comment}</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-2 mt-3">
