@@ -3,6 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '@tradeapp/shared';
 
+function validatePhone(phone: string): string {
+  if (!phone.trim()) return '';
+  const stripped = phone.replace(/[\s\-().]/g, '');
+  if (/^(0[1-9]\d{9}|\+44[1-9]\d{9})$/.test(stripped)) return '';
+  return 'Please enter a valid UK phone number (e.g. 07911 123456)';
+}
+
 export function RegisterForm() {
   const [formData, setFormData] = useState({
     email: '',
@@ -14,17 +21,21 @@ export function RegisterForm() {
     role: UserRole.CUSTOMER,
   });
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (e.target.name === 'phone') setPhoneError('');
   };
 
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     setError('');
+    const pErr = validatePhone(formData.phone);
+    if (pErr) { setPhoneError(pErr); return; }
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -87,7 +98,17 @@ export function RegisterForm() {
 
             <div className="form-group">
               <label htmlFor="phone" className="form-label">Phone <span className="text-light">(optional)</span></label>
-              <input id="phone" name="phone" type="tel" className="form-input" value={formData.phone} onChange={handleChange} />
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                className="form-input"
+                placeholder="e.g. 07911 123456"
+                value={formData.phone}
+                onChange={handleChange}
+                onBlur={() => setPhoneError(validatePhone(formData.phone))}
+              />
+              {phoneError && <p className="text-xs" style={{ color: 'var(--color-danger, #ef4444)', marginTop: '4px' }}>{phoneError}</p>}
             </div>
 
             <div className="form-group">

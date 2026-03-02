@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jobService } from '../services/jobService';
 import type { Category } from '../services/jobService';
+import type { GeocodeSuggestion } from '../services/geocodeService';
+import { AddressAutocomplete } from '../components/AddressAutocomplete';
 
 export function PostJobPage() {
   const { user, logout } = useAuth();
@@ -10,6 +12,7 @@ export function PostJobPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [geocodedLocation, setGeocodedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const [form, setForm] = useState({
     categoryId: '',
@@ -28,6 +31,16 @@ export function PostJobPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleAddressChange = (value: string) => {
+    setForm((prev) => ({ ...prev, address: value }));
+    setGeocodedLocation(null);
+  };
+
+  const handleAddressSelect = (suggestion: GeocodeSuggestion) => {
+    setForm((prev) => ({ ...prev, address: suggestion.shortName }));
+    setGeocodedLocation({ latitude: suggestion.latitude, longitude: suggestion.longitude });
+  };
+
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     setError('');
@@ -44,6 +57,7 @@ export function PostJobPage() {
         address: form.address,
         urgency: form.urgency,
         estimatedBudget: form.estimatedBudget ? Number(form.estimatedBudget) : undefined,
+        location: geocodedLocation ?? undefined,
       });
       navigate('/jobs');
     } catch (err: any) {
@@ -59,7 +73,7 @@ export function PostJobPage() {
         <div className="navbar-inner">
           <Link to="/" className="navbar-brand">TradeApp</Link>
           <div className="navbar-actions">
-            <Link to="/jobs" className="btn btn-outline">Browse Jobs</Link>
+            <Link to="/my-jobs" className="btn btn-outline">My Jobs</Link>
             <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
             <button className="btn btn-outline" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
           </div>
@@ -95,8 +109,21 @@ export function PostJobPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="address" className="form-label">Address</label>
-              <input id="address" name="address" type="text" className="form-input" placeholder="123 Main St, City, Postcode" value={form.address} onChange={handleChange} required />
+              <label className="form-label">Address</label>
+              <AddressAutocomplete
+                id="address"
+                name="address"
+                value={form.address}
+                onChange={handleAddressChange}
+                onSelect={handleAddressSelect}
+                placeholder="Start typing a street, area or postcode…"
+                required
+              />
+              {geocodedLocation && (
+                <p className="text-xs text-muted" style={{ marginTop: '4px' }}>
+                  Pinned on map
+                </p>
+              )}
             </div>
 
             <div className="form-row">

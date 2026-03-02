@@ -63,6 +63,64 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/ratings', ratingsRoutes);
 
+// Geocoding endpoint — proxies to Nominatim so frontend avoids CORS
+app.get('/api/geocode', async (req, res) => {
+  const { address } = req.query;
+  if (!address || typeof address !== 'string') {
+    res.status(400).json({ error: 'address query parameter is required' });
+    return;
+  }
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+    const response = await fetch(url, { headers: { 'User-Agent': 'TradeApp/1.0 (dev)' } });
+    const data = await response.json() as any[];
+    if (!data.length) {
+      res.status(404).json({ error: 'Address not found' });
+      return;
+    }
+    res.json({
+      latitude: parseFloat(data[0].lat),
+      longitude: parseFloat(data[0].lon),
+      displayName: data[0].display_name,
+    });
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    res.status(500).json({ error: 'Geocoding failed' });
+  }
+});
+
+// Geocoding autocomplete endpoint — UK only, returns up to 5 suggestions
+app.get('/api/geocode/suggest', async (req, res) => {
+  const { query } = req.query;
+  if (!query || typeof query !== 'string' || query.trim().length < 3) {
+    res.json({ suggestions: [] });
+    return;
+  }
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&countrycodes=gb&format=json&limit=5&addressdetails=1`;
+    const response = await fetch(url, { headers: { 'User-Agent': 'TradeApp/1.0 (dev)' } });
+    const data = await response.json() as any[];
+    const suggestions = data.map((item: any) => {
+      const a = item.address || {};
+      const parts = [
+        a.house_number && a.road ? `${a.house_number} ${a.road}` : a.road,
+        a.town || a.city || a.village || a.suburb,
+        a.postcode,
+      ].filter(Boolean);
+      return {
+        displayName: item.display_name,
+        shortName: parts.join(', ') || item.display_name,
+        latitude: parseFloat(item.lat),
+        longitude: parseFloat(item.lon),
+      };
+    });
+    res.json({ suggestions });
+  } catch (error) {
+    console.error('Geocode suggest error:', error);
+    res.json({ suggestions: [] });
+  }
+});
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);

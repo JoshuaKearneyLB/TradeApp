@@ -43,18 +43,38 @@ export async function createJob(req: AuthRequest, res: Response): Promise<void> 
  */
 export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { status, categoryId, page = '1', limit = '20' } = req.query;
+    const { status, categoryId, page = '1', limit = '20', lat, lng, radiusKm } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = 'WHERE 1=1';
     const params: unknown[] = [];
     let paramIndex = 1;
+
+    // Location filter — must be added before other params so positions are known
+    let locationCondition = '';
+    let distanceSelect = '';
+    let orderBy = 'ORDER BY j.created_at DESC';
+
+    if (lat && lng) {
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      const radiusMeters = Number(radiusKm || 50) * 1000;
+      const latIdx = paramIndex++;
+      const lngIdx = paramIndex++;
+      const radiusIdx = paramIndex++;
+      params.push(lngNum, latNum, radiusMeters);
+
+      locationCondition = `AND j.location IS NOT NULL
+        AND ST_DWithin(j.location, ST_SetSRID(ST_MakePoint($${latIdx}, $${lngIdx}), 4326)::geography, $${radiusIdx})`;
+      distanceSelect = `, ST_Distance(j.location, ST_SetSRID(ST_MakePoint($${latIdx}, $${lngIdx}), 4326)::geography) / 1000 AS distance_km`;
+      orderBy = `ORDER BY distance_km ASC`;
+    }
+
+    let whereClause = `WHERE 1=1 ${locationCondition}`;
 
     if (status) {
       whereClause += ` AND j.status = $${paramIndex++}`;
       params.push(status);
     } else {
-      // Default to only showing open (pending) jobs
       whereClause += ` AND j.status = 'pending'`;
     }
 
@@ -69,7 +89,8 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
       `SELECT
          j.*,
          ST_Y(j.location::geometry) as latitude,
-         ST_X(j.location::geometry) as longitude,
+         ST_X(j.location::geometry) as longitude
+         ${distanceSelect},
          u.first_name AS customer_first_name,
          u.last_name AS customer_last_name,
          sc.name AS category_name,
@@ -78,7 +99,7 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
        JOIN users u ON j.customer_id = u.id
        JOIN service_categories sc ON j.category_id = sc.id
        ${whereClause}
-       ORDER BY j.created_at DESC
+       ${orderBy}
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
       params
     );
@@ -363,6 +384,7 @@ function formatJob(row: any) {
 function formatJobWithDetails(row: any) {
   return {
     ...formatJob(row),
+    distanceKm: row.distance_km != null ? parseFloat(row.distance_km) : null,
     customer: {
       firstName: row.customer_first_name,
       lastName: row.customer_last_name,

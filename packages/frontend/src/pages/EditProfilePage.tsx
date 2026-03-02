@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+function validatePhone(phone: string): string {
+  if (!phone.trim()) return '';
+  const stripped = phone.replace(/[\s\-().]/g, '');
+  if (/^(0[1-9]\d{9}|\+44[1-9]\d{9})$/.test(stripped)) return '';
+  return 'Please enter a valid UK phone number (e.g. 07911 123456)';
+}
 import { profileService } from '../services/profileService';
 import { jobService } from '../services/jobService';
 import type { Skill } from '../services/profileService';
 import type { Category } from '../services/jobService';
+import type { GeocodeSuggestion } from '../services/geocodeService';
+import { AddressAutocomplete } from '../components/AddressAutocomplete';
 import { UserRole } from '@tradeapp/shared';
 
 export function EditProfilePage() {
@@ -28,6 +37,8 @@ export function EditProfilePage() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
+  const [locationAddress, setLocationAddress] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -64,10 +75,20 @@ export function EditProfilePage() {
 
   const handleBasicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBasic({ ...basic, [e.target.name]: e.target.value });
+    if (e.target.name === 'phone') setPhoneError('');
   };
 
   const handleProChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setPro({ ...pro, [e.target.name]: e.target.value });
+  };
+
+  const handleLocationSelect = (suggestion: GeocodeSuggestion) => {
+    setLocationAddress(suggestion.shortName);
+    setPro((prev) => ({
+      ...prev,
+      locationLat: String(suggestion.latitude),
+      locationLng: String(suggestion.longitude),
+    }));
   };
 
   // Skills helpers
@@ -90,6 +111,8 @@ export function EditProfilePage() {
     e.preventDefault();
     setError('');
     setSuccess('');
+    const pErr = validatePhone(basic.phone);
+    if (pErr) { setPhoneError(pErr); return; }
     setSaving(true);
 
     try {
@@ -164,8 +187,18 @@ export function EditProfilePage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone" className="form-label">Phone</label>
-              <input id="phone" name="phone" type="tel" className="form-input" value={basic.phone} onChange={handleBasicChange} />
+              <label htmlFor="phone" className="form-label">Phone <span className="text-light">(optional)</span></label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                className="form-input"
+                placeholder="e.g. 07911 123456"
+                value={basic.phone}
+                onChange={handleBasicChange}
+                onBlur={() => setPhoneError(validatePhone(basic.phone))}
+              />
+              {phoneError && <p className="text-xs" style={{ color: 'var(--color-danger, #ef4444)', marginTop: '4px' }}>{phoneError}</p>}
             </div>
           </div>
 
@@ -212,19 +245,24 @@ export function EditProfilePage() {
                   </div>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="locationLat" className="form-label">Latitude</label>
-                    <input id="locationLat" name="locationLat" type="number" className="form-input" step="any" placeholder="e.g. 51.5074" value={pro.locationLat} onChange={handleProChange} />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="locationLng" className="form-label">Longitude</label>
-                    <input id="locationLng" name="locationLng" type="number" className="form-input" step="any" placeholder="e.g. -0.1278" value={pro.locationLng} onChange={handleProChange} />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Your location</label>
+                  <AddressAutocomplete
+                    value={locationAddress}
+                    onChange={(v) => { setLocationAddress(v); setPro((p) => ({ ...p, locationLat: '', locationLng: '' })); }}
+                    onSelect={handleLocationSelect}
+                    placeholder="Start typing your base address or postcode…"
+                  />
+                  {pro.locationLat && pro.locationLng ? (
+                    <p className="text-xs text-muted" style={{ marginTop: '4px' }}>
+                      Set: {parseFloat(pro.locationLat).toFixed(5)}, {parseFloat(pro.locationLng).toFixed(5)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-light" style={{ marginTop: '4px' }}>
+                      Used for location-based job matching. Select an address from the dropdown.
+                    </p>
+                  )}
                 </div>
-                <p className="text-xs text-light" style={{ marginTop: '-8px' }}>
-                  Used for location-based job matching. You can find your coordinates on Google Maps.
-                </p>
               </div>
 
               {/* ── Skills ── */}

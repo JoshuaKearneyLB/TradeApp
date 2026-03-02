@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../services/jobService';
 import type { JobResponse } from '../services/jobService';
 import { UserRole } from '@tradeapp/shared';
+import { MapView } from '../components/MapView';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Open',
@@ -25,6 +26,7 @@ export function MyJobsPage() {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   const fetchJobs = async () => {
     setIsLoading(true);
@@ -89,12 +91,34 @@ export function MyJobsPage() {
       </nav>
 
       <div className="page">
-        <h1>{isCustomer ? 'My Posted Jobs' : 'My Accepted Jobs'}</h1>
-        <p className="text-muted">
-          {isCustomer
-            ? 'Jobs you have posted. You can view details or cancel them.'
-            : 'Jobs you have accepted or are working on.'}
-        </p>
+        <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+          <div>
+            <h1 style={{ marginBottom: '4px' }}>{isCustomer ? 'My Posted Jobs' : 'My Accepted Jobs'}</h1>
+            <p className="text-muted" style={{ margin: 0 }}>
+              {isCustomer
+                ? 'Jobs you have posted. You can view details or cancel them.'
+                : 'Jobs you have accepted or are working on.'}
+            </p>
+          </div>
+          {jobs.length > 0 && (
+            <div className="flex gap-1">
+              <button
+                className={viewMode === 'list' ? 'btn btn-primary' : 'btn btn-outline'}
+                style={{ padding: '6px 16px' }}
+                onClick={() => setViewMode('list')}
+              >
+                List
+              </button>
+              <button
+                className={viewMode === 'map' ? 'btn btn-primary' : 'btn btn-outline'}
+                style={{ padding: '6px 16px' }}
+                onClick={() => setViewMode('map')}
+              >
+                Map
+              </button>
+            </div>
+          )}
+        </div>
 
         <hr className="divider" />
 
@@ -111,6 +135,8 @@ export function MyJobsPage() {
               <Link to="/jobs" className="btn btn-primary mt-2">Browse available jobs</Link>
             )}
           </div>
+        ) : viewMode === 'map' ? (
+          <MapView jobs={jobs} />
         ) : (
           <div className="flex-col gap-2">
             {jobs.map((job) => (

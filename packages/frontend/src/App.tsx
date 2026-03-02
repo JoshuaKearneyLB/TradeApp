@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { UserRole } from '@tradeapp/shared';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -30,7 +31,7 @@ function App() {
           <Route
             path="/jobs"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole={UserRole.PROFESSIONAL}>
                 <JobsPage />
               </ProtectedRoute>
             }

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { query } from '../config/database.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { sanitisePhone } from '../utils/phone.js';
 
 /**
  * Update basic user profile (any role): firstName, lastName, phone
@@ -15,13 +16,24 @@ export async function updateProfile(req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    // Sanitise and validate phone when provided
+    let sanitisedPhone: string | null | undefined;
+    if (phone !== undefined) {
+      try {
+        sanitisedPhone = sanitisePhone(phone);
+      } catch (err: any) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+    }
+
     const sets: string[] = [];
     const params: unknown[] = [];
     let idx = 1;
 
     if (firstName) { sets.push(`first_name = $${idx++}`); params.push(firstName); }
     if (lastName) { sets.push(`last_name = $${idx++}`); params.push(lastName); }
-    if (phone !== undefined) { sets.push(`phone = $${idx++}`); params.push(phone || null); }
+    if (phone !== undefined) { sets.push(`phone = $${idx++}`); params.push(sanitisedPhone); }
 
     params.push(userId);
 

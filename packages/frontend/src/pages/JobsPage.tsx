@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jobService } from '../services/jobService';
 import type { JobResponse, Category } from '../services/jobService';
+import { MapView } from '../components/MapView';
 
 const URGENCY_LABELS: Record<string, string> = {
   low: 'Low',
@@ -12,19 +13,27 @@ const URGENCY_LABELS: Record<string, string> = {
 };
 
 export function JobsPage() {
-  const { user, logout } = useAuth();
+  const { user, professionalProfile, logout } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobResponse[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+
+  const proLocation = professionalProfile?.location;
+  const hasLocation = user?.role === 'professional' && proLocation?.latitude && proLocation?.longitude;
 
   const fetchJobs = async () => {
     setIsLoading(true);
     try {
-      // Only fetch open (pending) jobs — no status filter needed, backend defaults to pending
       const params: Record<string, unknown> = {};
       if (filterCategory) params.categoryId = Number(filterCategory);
+      if (hasLocation) {
+        params.lat = proLocation!.latitude;
+        params.lng = proLocation!.longitude;
+        params.radiusKm = professionalProfile!.availabilityRadiusKm;
+      }
       const data = await jobService.getJobs(params);
       setJobs(data.jobs);
     } catch (error) {
@@ -43,12 +52,14 @@ export function JobsPage() {
   const handleAccept = async (jobId: string) => {
     try {
       await jobService.acceptJob(jobId);
-      // Remove from the open list since it's no longer pending
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to accept job');
     }
   };
+
+  const proCenter: [number, number] | undefined =
+    hasLocation ? [proLocation!.latitude, proLocation!.longitude] : undefined;
 
   return (
     <>
@@ -64,8 +75,40 @@ export function JobsPage() {
       </nav>
 
       <div className="page">
-        <h1>Available Jobs</h1>
-        <p className="text-muted">Open jobs looking for a professional. Accept one to get started.</p>
+        <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+          <div>
+            <h1 style={{ marginBottom: '4px' }}>Available Jobs</h1>
+            <p className="text-muted" style={{ margin: 0 }}>
+              {hasLocation
+                ? `Jobs within ${professionalProfile!.availabilityRadiusKm} km of your location, sorted by distance.`
+                : 'Open jobs looking for a professional. Accept one to get started.'}
+            </p>
+          </div>
+          <div className="flex gap-1">
+            <button
+              className={viewMode === 'list' ? 'btn btn-primary' : 'btn btn-outline'}
+              style={{ padding: '6px 16px' }}
+              onClick={() => setViewMode('list')}
+            >
+              List
+            </button>
+            <button
+              className={viewMode === 'map' ? 'btn btn-primary' : 'btn btn-outline'}
+              style={{ padding: '6px 16px' }}
+              onClick={() => setViewMode('map')}
+            >
+              Map
+            </button>
+          </div>
+        </div>
+
+        {user?.role === 'professional' && !hasLocation && (
+          <div className="card-muted mb-3" style={{ borderLeft: '3px solid #f59e0b' }}>
+            <p className="text-sm" style={{ margin: 0 }}>
+              Set your location in <Link to="/edit-profile">Edit Profile</Link> to see only jobs within your service radius.
+            </p>
+          </div>
+        )}
 
         {/* Category filter */}
         <div className="card-muted mb-3">
@@ -80,13 +123,20 @@ export function JobsPage() {
           </div>
         </div>
 
-        {/* Job list */}
         {isLoading ? (
           <p className="text-center text-muted mt-4">Loading...</p>
         ) : jobs.length === 0 ? (
           <div className="text-center mt-4">
-            <p className="text-muted">No open jobs right now. Check back soon.</p>
+            <p className="text-muted">No open jobs{hasLocation ? ' in your area' : ''} right now. Check back soon.</p>
+            {hasLocation && (
+              <p className="text-sm text-muted">
+                Your service radius is {professionalProfile!.availabilityRadiusKm} km —{' '}
+                <Link to="/edit-profile">increase it in Edit Profile</Link>.
+              </p>
+            )}
           </div>
+        ) : viewMode === 'map' ? (
+          <MapView jobs={jobs} center={proCenter} />
         ) : (
           <div className="flex-col gap-2">
             {jobs.map((job) => (
@@ -100,9 +150,12 @@ export function JobsPage() {
                       {job.category?.name} &middot; {job.address}
                     </div>
                   </div>
-                  <div className="flex gap-1" style={{ alignItems: 'center' }}>
+                  <div className="flex gap-1" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className="badge">{URGENCY_LABELS[job.urgency] || job.urgency}</span>
                     {job.estimatedBudget && <span className="badge">${job.estimatedBudget}</span>}
+                    {(job as any).distanceKm != null && (
+                      <span className="badge">{((job as any).distanceKm as number).toFixed(1)} km</span>
+                    )}
                   </div>
                 </div>
 

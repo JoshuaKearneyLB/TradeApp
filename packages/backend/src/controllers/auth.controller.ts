@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { query } from '../config/database.js';
 import { generateToken } from '../middleware/auth.js';
+import { sanitisePhone } from '../utils/phone.js';
 import {
   RegisterRequest,
   LoginRequest,
@@ -18,6 +19,15 @@ export async function register(req: Request, res: Response): Promise<void> {
     // Validate required fields
     if (!email || !password || !role || !firstName || !lastName) {
       res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    // Sanitise and validate phone
+    let sanitisedPhone: string | null = null;
+    try {
+      sanitisedPhone = sanitisePhone(phone);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
       return;
     }
 
@@ -40,7 +50,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       `INSERT INTO users (email, password_hash, role, first_name, last_name, phone)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, email, role, first_name, last_name, phone, account_status, created_at, updated_at`,
-      [email, passwordHash, role, firstName, lastName, phone || null]
+      [email, passwordHash, role, firstName, lastName, sanitisedPhone]
     );
 
     const user = userResult.rows[0];
