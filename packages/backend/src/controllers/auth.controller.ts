@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { query } from '../config/database.js';
-import { generateToken } from '../middleware/auth.js';
+import { generateToken, AuthRequest, JWTPayload } from '../middleware/auth.js';
+import { revokeToken } from '../services/tokenBlacklist.js';
 import { sanitisePhone } from '../utils/phone.js';
 import {
   RegisterRequest,
@@ -12,15 +14,21 @@ import {
 
 const SALT_ROUNDS = 10;
 
+// Pre-computed dummy hash used to equalise timing when user is not found (prevents email enumeration)
+const DUMMY_HASH = await bcrypt.hash('dummy-timing-equaliser', SALT_ROUNDS);
+
 export async function register(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password, role, firstName, lastName, phone }: RegisterRequest = req.body;
+    const { email: rawEmail, password, role, firstName, lastName, phone }: RegisterRequest = req.body;
 
     // Validate required fields
-    if (!email || !password || !role || !firstName || !lastName) {
+    if (!rawEmail || !password || !role || !firstName || !lastName) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
+
+    // Normalise email to lowercase to prevent duplicate accounts via case variation
+    const email = rawEmail.toLowerCase().trim();
 
     // Sanitise and validate phone
     let sanitisedPhone: string | null = null;
@@ -31,9 +39,9 @@ export async function register(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Check if user already exists
+    // Check if user already exists (case-insensitive)
     const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT id FROM users WHERE LOWER(email) = $1',
       [email]
     );
 
@@ -111,39 +119,39 @@ export async function register(req: Request, res: Response): Promise<void> {
 
 export async function login(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password }: LoginRequest = req.body;
+    const { email: rawEmail, password }: LoginRequest = req.body;
 
-    // Validate required fields
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
 
-    // Find user
+    // Normalise email to lowercase
+    const email = rawEmail.toLowerCase().trim();
+
+    // Find user (case-insensitive lookup)
     const userResult = await query(
       `SELECT id, email, password_hash, role, first_name, last_name, phone, account_status, created_at, updated_at
        FROM users
-       WHERE email = $1`,
+       WHERE LOWER(email) = $1`,
       [email]
     );
 
-    if (userResult.rows.length === 0) {
+    const user = userResult.rows[0] ?? null;
+
+    // Always run bcrypt.compare to prevent timing-based email enumeration.
+    // If user not found, compare against dummy hash (same bcrypt cost, result discarded).
+    const hashToCheck = user ? user.password_hash : DUMMY_HASH;
+    const isValidPassword = await bcrypt.compare(password, hashToCheck);
+
+    if (!user || !isValidPassword) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
-
-    const user = userResult.rows[0];
 
     // Check if account is active
     if (user.account_status !== 'active') {
       res.status(403).json({ error: 'Account is suspended or deleted' });
-      return;
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    if (!isValidPassword) {
-      res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
@@ -181,7 +189,6 @@ export async function login(req: Request, res: Response): Promise<void> {
       }
     }
 
-    // Generate JWT token
     const token = generateToken({
       userId: user.id,
       email: user.email,
@@ -211,6 +218,22 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function logout(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { jti, exp } = req.user as JWTPayload & { exp?: number };
+
+    if (jti && exp) {
+      const expiresAt = new Date(exp * 1000);
+      await revokeToken(jti, expiresAt);
+    }
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 export async function getMe(req: Request, res: Response): Promise<void> {
   try {
     const authReq = req as any;
@@ -221,7 +244,6 @@ export async function getMe(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Get user
     const userResult = await query(
       `SELECT id, email, role, first_name, last_name, phone, account_status, created_at, updated_at
        FROM users
@@ -236,7 +258,6 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 
     const user = userResult.rows[0];
 
-    // Get professional profile if applicable
     let professionalProfile = undefined;
     if (user.role === 'professional') {
       const profileResult = await query(
@@ -271,7 +292,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     }
 
     const response: AuthResponse = {
-      token: '', // Token not needed for /me endpoint
+      token: '',
       user: {
         id: user.id,
         email: user.email,

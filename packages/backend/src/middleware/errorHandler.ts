@@ -15,9 +15,11 @@ export function errorHandler(
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal server error';
 
+  // Never expose stack traces unless explicitly in development mode
+  const isDev = process.env.NODE_ENV === 'development';
   res.status(statusCode).json({
     error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(isDev && { stack: err.stack }),
   });
 }
 

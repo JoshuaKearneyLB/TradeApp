@@ -14,6 +14,12 @@ export async function createJob(req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
+    const catCheck = await query('SELECT id FROM service_categories WHERE id = $1', [categoryId]);
+    if (catCheck.rows.length === 0) {
+      res.status(400).json({ error: 'Invalid category' });
+      return;
+    }
+
     let locationSQL = 'NULL';
     const params: unknown[] = [userId, categoryId, title, description, address, urgency || 'medium', estimatedBudget || null, scheduledDate || null];
 
@@ -45,8 +51,26 @@ export async function createJob(req: AuthRequest, res: Response): Promise<void> 
  */
 export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { status, categoryId, page = '1', limit = '20', lat, lng, radiusKm } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const rawPage = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+    const rawLimit = Math.min(50, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
+    const { status, categoryId } = req.query;
+    const page = rawPage;
+    const limit = rawLimit;
+    const offset = (page - 1) * limit;
+
+    // Validate optional location params
+    const lat = req.query.lat !== undefined ? Number(req.query.lat) : undefined;
+    const lng = req.query.lng !== undefined ? Number(req.query.lng) : undefined;
+    const radiusKm = req.query.radiusKm !== undefined ? Math.min(200, Math.max(1, Number(req.query.radiusKm))) : undefined;
+
+    if (lat !== undefined && (isNaN(lat) || lat < -90 || lat > 90)) {
+      res.status(400).json({ error: 'lat must be between -90 and 90' });
+      return;
+    }
+    if (lng !== undefined && (isNaN(lng) || lng < -180 || lng > 180)) {
+      res.status(400).json({ error: 'lng must be between -180 and 180' });
+      return;
+    }
 
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -56,10 +80,10 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
     let distanceSelect = '';
     let orderBy = 'ORDER BY j.created_at DESC';
 
-    if (lat && lng) {
-      const latNum = Number(lat);
-      const lngNum = Number(lng);
-      const radiusMeters = Number(radiusKm || 50) * 1000;
+    if (lat !== undefined && lng !== undefined) {
+      const latNum = lat;
+      const lngNum = lng;
+      const radiusMeters = (radiusKm ?? 50) * 1000;
       const latIdx = paramIndex++;
       const lngIdx = paramIndex++;
       const radiusIdx = paramIndex++;
@@ -116,8 +140,8 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
     res.json({
       jobs,
       total: parseInt(countResult.rows[0].count),
-      page: Number(page),
-      limit: Number(limit),
+      page,
+      limit,
     });
   } catch (error) {
     console.error('Get jobs error:', error);
@@ -125,9 +149,15 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getJobById(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(400).json({ error: 'Invalid job ID format' });
+      return;
+    }
 
     const result = await query(
       `SELECT
@@ -158,18 +188,23 @@ export async function getJobById(req: AuthRequest, res: Response): Promise<void>
     }
 
     const row = result.rows[0];
+    const requestingUserId = req.user!.userId;
+    const isInvolved =
+      requestingUserId === row.customer_id ||
+      requestingUserId === row.professional_id;
+
     const job = {
       ...formatJob(row),
       customer: {
         firstName: row.customer_first_name,
         lastName: row.customer_last_name,
-        phone: row.customer_phone,
+        phone: isInvolved ? row.customer_phone : undefined,
       },
       professional: row.professional_id
         ? {
             firstName: row.professional_first_name,
             lastName: row.professional_last_name,
-            phone: row.professional_phone,
+            phone: isInvolved ? row.professional_phone : undefined,
             averageRating: row.professional_rating ? parseFloat(row.professional_rating) : 0,
           }
         : null,
@@ -190,6 +225,10 @@ export async function acceptJob(req: AuthRequest, res: Response): Promise<void> 
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(400).json({ error: 'Invalid job ID format' });
+      return;
+    }
 
     const jobResult = await query('SELECT * FROM jobs WHERE id = $1', [id]);
     if (jobResult.rows.length === 0) {
@@ -203,9 +242,14 @@ export async function acceptJob(req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
+    if (job.customer_id === userId) {
+      res.status(403).json({ error: 'Cannot accept your own job' });
+      return;
+    }
+
     const result = await query(
       `UPDATE jobs SET professional_id = $1, status = 'accepted', accepted_at = NOW()
-       WHERE id = $2 AND status = 'pending'
+       WHERE id = $2 AND status = 'pending' AND professional_id IS NULL
        RETURNING *,
          ST_Y(location::geometry) as latitude,
          ST_X(location::geometry) as longitude`,
@@ -264,11 +308,15 @@ export async function updateJobStatus(req: AuthRequest, res: Response): Promise<
     const userId = req.user!.userId;
     const { id } = req.params;
     const { status } = req.body;
+    if (!UUID_RE.test(id)) {
+      res.status(400).json({ error: 'Invalid job ID format' });
+      return;
+    }
 
     const validTransitions: Record<string, string[]> = {
+      pending: ['cancelled'],
       accepted: ['in_progress', 'cancelled'],
       in_progress: ['completed', 'cancelled'],
-      pending: ['cancelled'],
     };
 
     const jobResult = await query('SELECT * FROM jobs WHERE id = $1', [id]);
@@ -296,11 +344,11 @@ export async function updateJobStatus(req: AuthRequest, res: Response): Promise<
 
     const result = await query(
       `UPDATE jobs SET status = $1 ${extraSet}
-       WHERE id = $2
+       WHERE id = $2 AND (customer_id = $3 OR professional_id = $3)
        RETURNING *,
          ST_Y(location::geometry) as latitude,
          ST_X(location::geometry) as longitude`,
-      [status, id]
+      [status, id, userId]
     );
 
     if (status === 'completed' && job.professional_id) {
@@ -395,29 +443,36 @@ export async function deleteJob(req: AuthRequest, res: Response): Promise<void> 
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(400).json({ error: 'Invalid job ID format' });
+      return;
+    }
 
-    const jobResult = await query('SELECT * FROM jobs WHERE id = $1', [id]);
+    // Atomic ownership + status check prevents TOCTOU race condition
+    const jobResult = await query(
+      'SELECT id FROM jobs WHERE id = $1 AND customer_id = $2',
+      [id, userId]
+    );
     if (jobResult.rows.length === 0) {
       res.status(404).json({ error: 'Job not found' });
       return;
     }
 
-    const job = jobResult.rows[0];
+    // Attempt atomic delete — only succeeds if status is still 'cancelled'
+    const deleteResult = await query(
+      'DELETE FROM jobs WHERE id = $1 AND customer_id = $2 AND status = $3 RETURNING id',
+      [id, userId, 'cancelled']
+    );
 
-    if (job.customer_id !== userId) {
-      res.status(403).json({ error: 'Only the customer who posted this job can remove it' });
-      return;
-    }
-
-    if (job.status !== 'cancelled') {
+    if (deleteResult.rows.length === 0) {
       res.status(400).json({ error: 'Job must be cancelled before it can be removed' });
       return;
     }
 
+    // Clean up related rows after confirmed deletion
     await query('DELETE FROM messages WHERE job_id = $1', [id]);
     await query('DELETE FROM notifications WHERE related_job_id = $1', [id]);
     await query('DELETE FROM ratings WHERE job_id = $1', [id]);
-    await query('DELETE FROM jobs WHERE id = $1', [id]);
 
     res.json({ deleted: true });
   } catch (error) {

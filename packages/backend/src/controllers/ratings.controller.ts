@@ -40,6 +40,16 @@ export async function createRating(req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
+    // Verify the professional's account is still active
+    const proCheck = await query(
+      'SELECT account_status FROM users WHERE id = $1',
+      [job.professional_id]
+    );
+    if (proCheck.rows.length === 0 || proCheck.rows[0].account_status !== 'active') {
+      res.status(400).json({ error: 'Professional account is no longer active' });
+      return;
+    }
+
     const result = await query(
       `INSERT INTO ratings (job_id, customer_id, professional_id, rating, comment)
        VALUES ($1, $2, $3, $4, $5)
@@ -61,6 +71,22 @@ export async function createRating(req: AuthRequest, res: Response): Promise<voi
 export async function getJobRating(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { jobId } = req.params;
+    const userId = req.user!.userId;
+
+    // Only parties involved in the job can view its rating
+    const jobCheck = await query(
+      'SELECT customer_id, professional_id FROM jobs WHERE id = $1',
+      [jobId]
+    );
+    if (jobCheck.rows.length === 0) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+    const { customer_id, professional_id } = jobCheck.rows[0];
+    if (userId !== customer_id && userId !== professional_id) {
+      res.status(403).json({ error: 'Not authorized to view this rating' });
+      return;
+    }
 
     const result = await query(
       `SELECT r.*,

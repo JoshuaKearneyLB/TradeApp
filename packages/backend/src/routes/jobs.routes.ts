@@ -10,6 +10,8 @@ import {
   deleteJob,
 } from '../controllers/jobs.controller.js';
 import { UserRole } from '@tradeapp/shared';
+import { validate } from '../middleware/validate.js';
+import { createJobSchema, updateJobStatusSchema } from '../schemas/jobs.schemas.js';
 
 const router = Router();
 
@@ -23,13 +25,13 @@ router.get('/mine', authenticateToken, getMyJobs);
 router.get('/:id', authenticateToken, getJobById);
 
 // Customer creates a job
-router.post('/', authenticateToken, requireRole(UserRole.CUSTOMER), createJob);
+router.post('/', authenticateToken, requireRole(UserRole.CUSTOMER), validate(createJobSchema), createJob);
 
 // Professional accepts a job
 router.post('/:id/accept', authenticateToken, requireRole(UserRole.PROFESSIONAL), acceptJob);
 
 // Either party updates status
-router.put('/:id/status', authenticateToken, updateJobStatus);
+router.put('/:id/status', authenticateToken, validate(updateJobStatusSchema), updateJobStatus);
 
 // Customer permanently removes a cancelled job
 router.delete('/:id', authenticateToken, requireRole(UserRole.CUSTOMER), deleteJob);
