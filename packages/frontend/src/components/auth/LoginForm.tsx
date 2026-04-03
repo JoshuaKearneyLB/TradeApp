@@ -25,58 +25,75 @@ export function LoginForm() {
   };
 
   return (
-    <>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column' }}>
       <nav className="navbar">
         <div className="navbar-inner">
-          <Link to="/" className="navbar-brand">TradeApp</Link>
+          <Link to="/" className="navbar-brand">
+            TradeApp<span className="navbar-brand-dot" />
+          </Link>
         </div>
       </nav>
 
-      <div className="page-narrow">
-        <h2 style={{ marginBottom: '6px' }}>Welcome back</h2>
-        <p className="text-muted">Sign in to your account</p>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px' }}>
+        <div style={{ width: '100%', maxWidth: 420 }} className="animate-in">
 
-        <div className="card mt-3">
-          {error && <div className="alert alert-error">{error}</div>}
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 'var(--radius-lg)',
+              background: 'var(--color-navy)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', margin: '0 auto 20px', fontSize: '1.5rem',
+            }}>🔧</div>
+            <h2 style={{ marginBottom: 6 }}>Welcome back</h2>
+            <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>Sign in to your TradeApp account</p>
+          </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="email" className="form-label">Email</label>
-              <input
-                id="email"
-                type="email"
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
+          <div className="card" style={{ padding: '36px 32px' }}>
+            {error && <div className="alert alert-error">{error}</div>}
 
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">Password</label>
-              <input
-                id="password"
-                type="password"
-                className="form-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label htmlFor="email" className="form-label">Email address</label>
+                <input
+                  id="email"
+                  type="email"
+                  className="form-input"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                />
+              </div>
 
-            <button type="submit" className="btn btn-primary" disabled={isLoading} style={{ width: '100%', marginTop: '8px' }}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
+              <div className="form-group" style={{ marginBottom: 24 }}>
+                <label htmlFor="password" className="form-label">Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  className="form-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}>
+                {isLoading ? (
+                  <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} /> Signing in…</>
+                ) : 'Sign in'}
+              </button>
+            </form>
+          </div>
+
+          <p className="text-center text-sm mt-3" style={{ color: 'var(--color-text-muted)' }}>
+            Don't have an account?{' '}
+            <Link to="/register" style={{ fontWeight: 600 }}>Create one free</Link>
+          </p>
         </div>
-
-        <p className="text-center text-sm mt-3">
-          Don't have an account?{' '}
-          <Link to="/register">Create one</Link>
-        </p>
       </div>
-    </>
+    </div>
   );
 }

@@ -282,19 +282,19 @@ async function startServer() {
       process.exit(1);
     }
 
-    // Run pending migrations
-    try {
-      const migrationsDir = join(__dirname, 'db', 'migrations');
-      const migrations = ['001_initial_schema.sql', '002_add_location_display.sql', '003_add_job_started_notification_type.sql', '004_add_revoked_tokens.sql'];
-      for (const file of migrations) {
+    // Run pending migrations — each file is attempted independently so a
+    // previously-applied migration doesn't block later ones from running.
+    const migrationsDir = join(__dirname, 'db', 'migrations');
+    const migrations = ['001_initial_schema.sql', '002_add_location_display.sql', '003_add_job_started_notification_type.sql', '004_add_revoked_tokens.sql'];
+    for (const file of migrations) {
+      try {
         const sql = readFileSync(join(migrationsDir, file), 'utf8');
         await pool.query(sql);
+      } catch {
+        // Already applied or no-op — safe to ignore
       }
-      console.log('✓ Migrations applied');
-    } catch (err) {
-      // Migrations may fail if already applied (e.g. duplicate column) — log but continue
-      console.log('✓ Migrations checked (some already applied)');
     }
+    console.log('✓ Migrations checked');
 
     // Start HTTP server
     httpServer.listen(PORT, () => {

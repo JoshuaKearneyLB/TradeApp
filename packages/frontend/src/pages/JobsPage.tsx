@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../services/jobService';
 import type { JobResponse, Category } from '../services/jobService';
 import { MapView } from '../components/MapView';
+import { NotificationBell } from '../components/NotificationBell';
 
-const URGENCY_LABELS: Record<string, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  emergency: 'Emergency',
+const URGENCY_CONFIG: Record<string, { label: string; badge: string }> = {
+  low:       { label: 'Low priority',  badge: 'badge-muted' },
+  medium:    { label: 'Medium',        badge: 'badge-amber' },
+  high:      { label: 'High',          badge: 'badge-warning' },
+  emergency: { label: 'Emergency',     badge: 'badge-danger' },
 };
 
 export function JobsPage() {
@@ -62,127 +63,195 @@ export function JobsPage() {
     hasLocation ? [proLocation!.latitude, proLocation!.longitude] : undefined;
 
   return (
-    <>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <nav className="navbar">
         <div className="navbar-inner">
-          <Link to="/" className="navbar-brand">TradeApp</Link>
+          <Link to="/" className="navbar-brand">TradeApp<span className="navbar-brand-dot" /></Link>
           <div className="navbar-actions">
-            <Link to="/my-jobs" className="btn btn-outline">My Jobs</Link>
-            <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
-            <button className="btn btn-outline" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
+            <Link to="/my-jobs" className="navbar-link">My Jobs</Link>
+            <Link to="/dashboard" className="navbar-link">Dashboard</Link>
+            <NotificationBell />
+            <button className="btn btn-ghost btn-sm" onClick={() => { logout(); navigate('/login'); }}>Log out</button>
           </div>
         </div>
       </nav>
 
       <div className="page">
-        <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
-          <div>
-            <h1 style={{ marginBottom: '4px' }}>Available Jobs</h1>
-            <p className="text-muted" style={{ margin: 0 }}>
-              {hasLocation
-                ? `Jobs within ${professionalProfile!.availabilityRadiusKm} km of your location, sorted by distance.`
-                : 'Open jobs looking for a professional. Accept one to get started.'}
-            </p>
-          </div>
-          <div className="flex gap-1">
-            <button
-              className={viewMode === 'list' ? 'btn btn-primary' : 'btn btn-outline'}
-              style={{ padding: '6px 16px' }}
-              onClick={() => setViewMode('list')}
-            >
-              List
-            </button>
-            <button
-              className={viewMode === 'map' ? 'btn btn-primary' : 'btn btn-outline'}
-              style={{ padding: '6px 16px' }}
-              onClick={() => setViewMode('map')}
-            >
-              Map
-            </button>
+        {/* Page header */}
+        <div className="animate-in" style={{ marginBottom: 28 }}>
+          <p className="section-label">Browse</p>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <h1 style={{ marginBottom: 4 }}>
+                Available jobs
+                <span style={{ color: 'var(--color-amber)' }}>.</span>
+              </h1>
+              <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
+                {hasLocation
+                  ? `Showing jobs within ${professionalProfile!.availabilityRadiusKm} km of your location`
+                  : 'Open jobs ready to be accepted — find your next project'}
+              </p>
+            </div>
+            {/* List / Map toggle */}
+            <div style={{
+              display: 'flex', background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+              padding: 4, gap: 4,
+            }}>
+              {(['list', 'map'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    padding: '6px 18px', border: 'none', borderRadius: 'var(--radius)',
+                    fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.85rem',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    background: viewMode === mode ? 'var(--color-navy)' : 'transparent',
+                    color: viewMode === mode ? '#fff' : 'var(--color-text-muted)',
+                  }}
+                >
+                  {mode === 'list' ? '≡ List' : '⊙ Map'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
+        {/* No-location warning */}
         {user?.role === 'professional' && !hasLocation && (
-          <div className="card-muted mb-3" style={{ borderLeft: '3px solid #f59e0b' }}>
-            <p className="text-sm" style={{ margin: 0 }}>
-              Set your location in <Link to="/edit-profile">Edit Profile</Link> to see only jobs within your service radius.
-            </p>
+          <div className="animate-in animate-in-delay-1" style={{
+            padding: '14px 18px', marginBottom: 20,
+            background: 'rgba(232,160,32,0.08)', border: '1px solid rgba(232,160,32,0.3)',
+            borderRadius: 'var(--radius)', fontSize: '0.875rem', color: '#7a4a00',
+          }}>
+            📍 <strong>No base location set</strong> — <Link to="/edit-profile" style={{ color: 'inherit', fontWeight: 700 }}>add one in your profile</Link> to see only jobs within your service radius
           </div>
         )}
 
-        {/* Category filter */}
-        <div className="card-muted mb-3">
-          <div style={{ maxWidth: '300px' }}>
-            <label htmlFor="filterCategory" className="form-label">Filter by category</label>
-            <select id="filterCategory" className="form-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+        {/* Filters bar */}
+        <div className="animate-in animate-in-delay-1" style={{
+          display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24,
+          padding: '16px 20px', background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
+          <label htmlFor="filterCategory" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+            Filter by
+          </label>
+          <select
+            id="filterCategory"
+            className="form-select"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            style={{ maxWidth: 260, marginBottom: 0 }}
+          >
+            <option value="">All trades</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {!isLoading && (
+            <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+              {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} found
+            </span>
+          )}
         </div>
 
+        {/* Content */}
         {isLoading ? (
-          <p className="text-center text-muted mt-4">Loading...</p>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+            <span className="spinner" style={{ width: 32, height: 32 }} />
+          </div>
         ) : jobs.length === 0 ? (
-          <div className="text-center mt-4">
-            <p className="text-muted">No open jobs{hasLocation ? ' in your area' : ''} right now. Check back soon.</p>
+          <div style={{ textAlign: 'center', padding: '64px 24px' }} className="animate-in">
+            <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔍</div>
+            <h3 style={{ marginBottom: 8, color: 'var(--color-text)' }}>No jobs found</h3>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: 20 }}>
+              {hasLocation
+                ? `No open jobs within ${professionalProfile!.availabilityRadiusKm} km right now — check back soon`
+                : 'No open jobs matching your filters at the moment'}
+            </p>
             {hasLocation && (
-              <p className="text-sm text-muted">
-                Your service radius is {professionalProfile!.availabilityRadiusKm} km —{' '}
-                <Link to="/edit-profile">increase it in Edit Profile</Link>.
-              </p>
+              <Link to="/edit-profile" className="btn btn-ghost btn-sm">
+                Increase service radius
+              </Link>
             )}
           </div>
         ) : viewMode === 'map' ? (
-          <MapView jobs={jobs} center={proCenter} />
+          <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+            <MapView jobs={jobs} center={proCenter} />
+          </div>
         ) : (
-          <div className="flex-col gap-2">
-            {jobs.map((job) => (
-              <div key={job.id} className="card">
-                <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    <Link to={`/jobs/${job.id}`} style={{ fontSize: '1.1rem', fontWeight: 700, textDecoration: 'none' }}>
-                      {job.title}
-                    </Link>
-                    <div className="text-sm text-muted mt-1">
-                      {job.category?.name} &middot; {job.address}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {jobs.map((job, i) => {
+              const urgency = URGENCY_CONFIG[job.urgency] ?? { label: job.urgency, badge: 'badge-muted' };
+              return (
+                <div
+                  key={job.id}
+                  className="card card-job animate-in"
+                  style={{ animationDelay: `${i * 0.04}s`, padding: '20px 24px' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Link
+                        to={`/jobs/${job.id}`}
+                        style={{
+                          fontFamily: 'var(--font-display)', fontSize: '1.05rem',
+                          fontWeight: 700, color: 'var(--color-text)', textDecoration: 'none',
+                        }}
+                      >
+                        {job.title}
+                      </Link>
+                      <div style={{ marginTop: 4, fontSize: '0.82rem', color: 'var(--color-text-muted)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <span>{job.category?.name}</span>
+                        <span>·</span>
+                        <span>📍 {job.address}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
+                      <span className={`badge ${urgency.badge}`}>{urgency.label}</span>
+                      {job.estimatedBudget && (
+                        <span className="badge badge-navy">£{job.estimatedBudget}</span>
+                      )}
+                      {(job as any).distanceKm != null && (
+                        <span className="badge badge-muted">
+                          {((job as any).distanceKm as number).toFixed(1)} km
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-1" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span className="badge">{URGENCY_LABELS[job.urgency] || job.urgency}</span>
-                    {job.estimatedBudget && <span className="badge">${job.estimatedBudget}</span>}
-                    {(job as any).distanceKm != null && (
-                      <span className="badge">{((job as any).distanceKm as number).toFixed(1)} km</span>
-                    )}
+
+                  <p style={{
+                    margin: '12px 0', fontSize: '0.875rem', color: 'var(--color-text-muted)',
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  }}>
+                    {job.description}
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
+                      Posted by {job.customer?.firstName} · {new Date(job.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Link to={`/jobs/${job.id}`} className="btn btn-ghost btn-sm">
+                        View details
+                      </Link>
+                      {user?.role === 'professional' && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleAccept(job.id)}
+                        >
+                          Accept job
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <p className="text-sm mt-2" style={{ marginBottom: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {job.description}
-                </p>
-
-                <div className="flex-between">
-                  <span className="text-xs text-light">
-                    Posted by {job.customer?.firstName} {job.customer?.lastName} &middot; {new Date(job.createdAt).toLocaleDateString()}
-                  </span>
-                  <div className="flex gap-1">
-                    <Link to={`/jobs/${job.id}`} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
-                      View
-                    </Link>
-                    {user?.role === 'professional' && (
-                      <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={() => handleAccept(job.id)}>
-                        Accept
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

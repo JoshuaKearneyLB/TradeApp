@@ -8,6 +8,7 @@ function validatePhone(phone: string): string {
   if (/^(0[1-9]\d{9}|\+44[1-9]\d{9})$/.test(stripped)) return '';
   return 'Please enter a valid UK phone number (e.g. 07911 123456)';
 }
+
 import { profileService } from '../services/profileService';
 import { jobService } from '../services/jobService';
 import type { Skill } from '../services/profileService';
@@ -15,15 +16,13 @@ import type { Category } from '../services/jobService';
 import type { GeocodeSuggestion } from '../services/geocodeService';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
 import { UserRole } from '@tradeapp/shared';
+import { NotificationBell } from '../components/NotificationBell';
 
 export function EditProfilePage() {
   const { user, professionalProfile, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
 
-  // Basic profile fields
   const [basic, setBasic] = useState({ firstName: '', lastName: '', phone: '' });
-
-  // Professional fields (no location here — stored separately below)
   const [pro, setPro] = useState({
     bio: '',
     hourlyRate: '',
@@ -31,16 +30,12 @@ export function EditProfilePage() {
     isAvailable: true,
   });
 
-  // Location state: geocodedLocation holds the saved coords; locationDisplay is the human-readable label;
-  // locationAddress is only the live search input (always starts empty)
   const [locationAddress, setLocationAddress] = useState('');
   const [locationDisplay, setLocationDisplay] = useState('');
   const [geocodedLocation, setGeocodedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Skills
   const [skills, setSkills] = useState<Skill[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-
   const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
@@ -48,14 +43,9 @@ export function EditProfilePage() {
 
   const isPro = user?.role === UserRole.PROFESSIONAL;
 
-  // Seed form with current data
   useEffect(() => {
     if (user) {
-      setBasic({
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone || '',
-      });
+      setBasic({ firstName: user.firstName, lastName: user.lastName, phone: user.phone || '' });
     }
     if (professionalProfile) {
       setPro({
@@ -65,10 +55,7 @@ export function EditProfilePage() {
         isAvailable: professionalProfile.isAvailable,
       });
       if (professionalProfile.location?.latitude && professionalProfile.location?.longitude) {
-        setGeocodedLocation({
-          latitude: professionalProfile.location.latitude,
-          longitude: professionalProfile.location.longitude,
-        });
+        setGeocodedLocation({ latitude: professionalProfile.location.latitude, longitude: professionalProfile.location.longitude });
         setLocationDisplay(
           professionalProfile.location.display ||
           `${professionalProfile.location.latitude.toFixed(4)}, ${professionalProfile.location.longitude.toFixed(4)}`
@@ -77,7 +64,6 @@ export function EditProfilePage() {
     }
   }, [user, professionalProfile]);
 
-  // Load categories + skills for professionals
   useEffect(() => {
     if (!isPro) return;
     jobService.getCategories().then(setCategories).catch(console.error);
@@ -93,10 +79,6 @@ export function EditProfilePage() {
     setPro({ ...pro, [e.target.name]: e.target.value });
   };
 
-  const handleAddressChange = (value: string) => {
-    setLocationAddress(value);
-  };
-
   const handleLocationSelect = (suggestion: GeocodeSuggestion) => {
     setLocationAddress('');
     setLocationDisplay(suggestion.shortName);
@@ -109,7 +91,6 @@ export function EditProfilePage() {
     setLocationAddress('');
   };
 
-  // Skills helpers
   const toggleSkill = (categoryId: number) => {
     const exists = skills.find((s) => s.categoryId === categoryId);
     if (exists) {
@@ -132,16 +113,8 @@ export function EditProfilePage() {
     const pErr = validatePhone(basic.phone);
     if (pErr) { setPhoneError(pErr); return; }
     setSaving(true);
-
     try {
-      // 1. Save basic profile
-      await profileService.updateProfile({
-        firstName: basic.firstName,
-        lastName: basic.lastName,
-        phone: basic.phone,
-      });
-
-      // 2. Save professional profile if applicable
+      await profileService.updateProfile({ firstName: basic.firstName, lastName: basic.lastName, phone: basic.phone });
       if (isPro) {
         await profileService.updateProfessionalProfile({
           bio: pro.bio || null,
@@ -151,16 +124,13 @@ export function EditProfilePage() {
           location: geocodedLocation ?? null,
           locationDisplay: geocodedLocation ? locationDisplay : null,
         });
-
-        // 3. Save skills
         await profileService.updateSkills(
           skills.map((s) => ({ categoryId: s.categoryId, yearsExperience: s.yearsExperience }))
         );
       }
-
-      // Refresh the auth context so dashboard etc. reflect changes
       await refreshUser();
       setSuccess('Profile saved successfully');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to save profile');
     } finally {
@@ -169,177 +139,230 @@ export function EditProfilePage() {
   };
 
   return (
-    <>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <nav className="navbar">
         <div className="navbar-inner">
-          <Link to="/" className="navbar-brand">TradeApp</Link>
+          <Link to="/" className="navbar-brand">TradeApp<span className="navbar-brand-dot" /></Link>
           <div className="navbar-actions">
-            <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
-            <button className="btn btn-outline" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
+            <Link to="/dashboard" className="navbar-link">Dashboard</Link>
+            <NotificationBell />
+            <button className="btn btn-ghost btn-sm" onClick={() => { logout(); navigate('/login'); }}>Log out</button>
           </div>
         </div>
       </nav>
 
-      <div className="page-narrow" style={{ maxWidth: '560px' }}>
-        <h2 style={{ marginBottom: '6px' }}>Edit profile</h2>
-        <p className="text-muted">Update your personal information{isPro ? ' and professional details' : ''}.</p>
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '40px 24px 80px' }}>
+        {/* Header */}
+        <div className="animate-in" style={{ marginBottom: 32 }}>
+          <p className="section-label">Account</p>
+          <h1 style={{ marginBottom: 6 }}>
+            Edit profile
+            <span style={{ color: 'var(--color-amber)' }}>.</span>
+          </h1>
+          <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
+            Update your {isPro ? 'personal and professional details' : 'account information'}.
+          </p>
+        </div>
 
-        <form onSubmit={handleSave}>
-          {error && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
+        <form onSubmit={handleSave} className="animate-in animate-in-delay-1">
+          {error && <div className="alert alert-error" style={{ marginBottom: 20 }}>{error}</div>}
+          {success && (
+            <div style={{
+              padding: '14px 18px', marginBottom: 20, borderRadius: 'var(--radius)',
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+              color: '#166534', fontSize: '0.875rem', fontWeight: 600,
+            }}>
+              ✓ {success}
+            </div>
+          )}
 
-          {/* ── Basic info ── */}
-          <div className="card mt-3">
-            <h3>Personal information</h3>
+          {/* Personal info */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h4 style={{ margin: '0 0 18px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Personal information</h4>
 
-            <div className="form-row mt-2">
+            <div className="form-row">
               <div className="form-group">
                 <label htmlFor="firstName" className="form-label">First name</label>
-                <input id="firstName" name="firstName" type="text" className="form-input" value={basic.firstName} onChange={handleBasicChange} required />
+                <input id="firstName" name="firstName" type="text" className="form-input"
+                  value={basic.firstName} onChange={handleBasicChange} required />
               </div>
               <div className="form-group">
                 <label htmlFor="lastName" className="form-label">Last name</label>
-                <input id="lastName" name="lastName" type="text" className="form-input" value={basic.lastName} onChange={handleBasicChange} required />
+                <input id="lastName" name="lastName" type="text" className="form-input"
+                  value={basic.lastName} onChange={handleBasicChange} required />
               </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="phone" className="form-label">Phone <span className="text-light">(optional)</span></label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="phone" className="form-label">
+                Phone <span style={{ color: 'var(--color-text-light)', fontWeight: 400 }}>(optional)</span>
+              </label>
               <input
-                id="phone"
-                name="phone"
-                type="tel"
-                className="form-input"
+                id="phone" name="phone" type="tel" className="form-input"
                 placeholder="e.g. 07911 123456"
-                value={basic.phone}
-                onChange={handleBasicChange}
+                value={basic.phone} onChange={handleBasicChange}
                 onBlur={() => setPhoneError(validatePhone(basic.phone))}
               />
-              {phoneError && <p className="text-xs" style={{ color: 'var(--color-danger, #ef4444)', marginTop: '4px' }}>{phoneError}</p>}
+              {phoneError && <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--color-danger)' }}>{phoneError}</p>}
             </div>
           </div>
 
-          {/* ── Professional details ── */}
+          {/* Professional details */}
           {isPro && (
             <>
-              <div className="card mt-3">
-                <h3>Professional details</h3>
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h4 style={{ margin: '0 0 18px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Professional details</h4>
 
-                <div className="form-group mt-2">
+                <div className="form-group">
                   <label htmlFor="bio" className="form-label">Bio</label>
-                  <textarea id="bio" name="bio" className="form-input" rows={3} placeholder="Tell customers about your experience and expertise..." value={pro.bio} onChange={handleProChange} style={{ resize: 'vertical' }} />
+                  <textarea
+                    id="bio" name="bio" className="form-input" rows={4}
+                    placeholder="Tell customers about your experience, qualifications and what makes you the right person for the job…"
+                    value={pro.bio} onChange={handleProChange}
+                    style={{ resize: 'vertical' }}
+                  />
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="hourlyRate" className="form-label">Hourly rate ($)</label>
-                    <input id="hourlyRate" name="hourlyRate" type="number" className="form-input" min="0" step="0.01" placeholder="e.g. 45" value={pro.hourlyRate} onChange={handleProChange} />
+                    <label htmlFor="hourlyRate" className="form-label">Hourly rate</label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{
+                        position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                        color: 'var(--color-text-muted)', fontWeight: 600,
+                      }}>£</span>
+                      <input
+                        id="hourlyRate" name="hourlyRate" type="number" className="form-input"
+                        min="0" step="0.01" placeholder="0.00"
+                        value={pro.hourlyRate} onChange={handleProChange}
+                        style={{ paddingLeft: 30 }}
+                      />
+                    </div>
                   </div>
                   <div className="form-group">
                     <label htmlFor="availabilityRadiusKm" className="form-label">Service radius (km)</label>
-                    <input id="availabilityRadiusKm" name="availabilityRadiusKm" type="number" className="form-input" min="1" max="500" value={pro.availabilityRadiusKm} onChange={handleProChange} />
+                    <input
+                      id="availabilityRadiusKm" name="availabilityRadiusKm" type="number" className="form-input"
+                      min="1" max="500"
+                      value={pro.availabilityRadiusKm} onChange={handleProChange}
+                    />
                   </div>
                 </div>
 
-                <div className="form-group">
+                {/* Availability toggle */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Availability</label>
                   <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
                     onClick={() => setPro({ ...pro, isAvailable: !pro.isAvailable })}
                   >
                     <div style={{
-                      width: '44px', height: '24px', borderRadius: '12px',
-                      backgroundColor: pro.isAvailable ? '#111' : '#ccc',
-                      position: 'relative', transition: 'background 0.2s',
+                      width: 48, height: 26, borderRadius: 13,
+                      background: pro.isAvailable ? 'var(--color-navy)' : 'var(--color-border)',
+                      position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                     }}>
                       <div style={{
-                        width: '20px', height: '20px', borderRadius: '10px',
-                        backgroundColor: '#fff', position: 'absolute', top: '2px',
-                        left: pro.isAvailable ? '22px' : '2px', transition: 'left 0.2s',
+                        width: 20, height: 20, borderRadius: 10, background: '#fff',
+                        position: 'absolute', top: 3,
+                        left: pro.isAvailable ? 25 : 3,
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                       }} />
                     </div>
-                    <span className="text-sm">{pro.isAvailable ? 'Available for work' : 'Not available'}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: pro.isAvailable ? 'var(--color-navy)' : 'var(--color-text-muted)' }}>
+                      {pro.isAvailable ? '🟢 Available for work' : '🔴 Not available'}
+                    </span>
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Your location</label>
-
-                  {/* Saved location chip */}
-                  {geocodedLocation && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      padding: '8px 12px', marginBottom: '8px',
-                      borderRadius: '6px', backgroundColor: '#f0fdf4',
-                      border: '1px solid #86efac',
-                    }}>
-                      <span style={{ fontSize: '0.875rem', flex: 1, color: '#166534' }}>
-                        📍 {locationDisplay}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleLocationClear}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#166534', fontSize: '1.1rem', lineHeight: 1, padding: '0 2px' }}
-                        title="Remove location"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-
-                  <AddressAutocomplete
-                    value={locationAddress}
-                    onChange={handleAddressChange}
-                    onSelect={handleLocationSelect}
-                    placeholder={geocodedLocation ? 'Search to change location…' : 'Start typing your base address or postcode…'}
-                  />
-                  {!geocodedLocation && (
-                    <p className="text-xs text-light" style={{ marginTop: '4px' }}>
-                      Used for location-based job matching. Select an address from the dropdown.
-                    </p>
-                  )}
                 </div>
               </div>
 
-              {/* ── Skills ── */}
-              <div className="card mt-3">
-                <h3>Skills</h3>
-                <p className="text-sm text-muted">Select the services you offer and your years of experience.</p>
+              {/* Location */}
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h4 style={{ margin: '0 0 18px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Base location</h4>
 
-                <div className="flex-col gap-1 mt-2">
+                {geocodedLocation && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px', marginBottom: 12,
+                    background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
+                    borderRadius: 'var(--radius)',
+                  }}>
+                    <span style={{ fontSize: '0.875rem', flex: 1, color: '#166534', fontWeight: 500 }}>
+                      📍 {locationDisplay}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleLocationClear}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#166534', fontSize: '1.1rem', padding: '0 2px', lineHeight: 1,
+                      }}
+                      title="Remove location"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                <AddressAutocomplete
+                  value={locationAddress}
+                  onChange={setLocationAddress}
+                  onSelect={handleLocationSelect}
+                  placeholder={geocodedLocation ? 'Search to change location…' : 'Start typing your base address or postcode…'}
+                />
+                {!geocodedLocation && (
+                  <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
+                    Used for location-based job matching. Select an address from the dropdown.
+                  </p>
+                )}
+              </div>
+
+              {/* Skills */}
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h4 style={{ margin: '0 0 6px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Skills & trades</h4>
+                <p style={{ margin: '0 0 16px', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                  Select the services you offer and add your years of experience.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {categories.map((cat) => {
                     const skill = skills.find((s) => s.categoryId === cat.id);
                     const isSelected = !!skill;
-
                     return (
-                      <div key={cat.id} style={{
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        padding: '10px 14px', borderRadius: 'var(--radius)',
-                        border: `1.5px solid ${isSelected ? '#111' : 'var(--color-border)'}`,
-                        backgroundColor: isSelected ? '#fafafa' : 'var(--color-bg)',
-                        cursor: 'pointer',
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSkill(cat.id)}
-                          style={{ width: '18px', height: '18px', accentColor: '#111' }}
-                        />
-                        <span
-                          className="text-sm"
-                          style={{ flex: 1, fontWeight: isSelected ? 600 : 400 }}
-                          onClick={() => toggleSkill(cat.id)}
-                        >
+                      <div
+                        key={cat.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '11px 14px', borderRadius: 'var(--radius)',
+                          border: `1.5px solid ${isSelected ? 'var(--color-navy)' : 'var(--color-border)'}`,
+                          background: isSelected ? 'rgba(27,58,92,0.04)' : 'var(--color-surface)',
+                          cursor: 'pointer', transition: 'all 0.15s',
+                        }}
+                        onClick={() => toggleSkill(cat.id)}
+                      >
+                        <div style={{
+                          width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                          border: `2px solid ${isSelected ? 'var(--color-navy)' : 'var(--color-border)'}`,
+                          background: isSelected ? 'var(--color-navy)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s',
+                        }}>
+                          {isSelected && <span style={{ color: '#fff', fontSize: '0.7rem', lineHeight: 1 }}>✓</span>}
+                        </div>
+                        <span style={{
+                          flex: 1, fontSize: '0.9rem',
+                          fontWeight: isSelected ? 600 : 400,
+                          color: isSelected ? 'var(--color-navy)' : 'var(--color-text)',
+                        }}>
                           {cat.name}
                         </span>
                         {isSelected && (
                           <input
                             type="number"
                             className="form-input"
-                            style={{ width: '80px', padding: '5px 8px', fontSize: '0.85rem' }}
-                            min="0"
-                            max="50"
-                            placeholder="Yrs"
+                            style={{ width: 80, padding: '5px 8px', fontSize: '0.82rem', marginBottom: 0 }}
+                            min="0" max="50"
+                            placeholder="Yrs exp"
                             value={skill?.yearsExperience ?? ''}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => updateSkillExperience(cat.id, e.target.value)}
@@ -353,12 +376,13 @@ export function EditProfilePage() {
             </>
           )}
 
-          {/* ── Save ── */}
-          <button type="submit" className="btn btn-primary mt-3" disabled={saving} style={{ width: '100%' }}>
-            {saving ? 'Saving...' : 'Save changes'}
+          <button type="submit" className="btn btn-primary btn-block" disabled={saving} style={{ fontSize: '1rem', padding: '14px' }}>
+            {saving
+              ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} /> Saving…</>
+              : 'Save changes'}
           </button>
         </form>
       </div>
-    </>
+    </div>
   );
 }

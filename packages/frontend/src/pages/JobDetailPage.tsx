@@ -6,21 +6,47 @@ import type { JobResponse } from '../services/jobService';
 import { ratingService } from '../services/ratingService';
 import type { RatingResponse } from '../services/ratingService';
 import { UserRole } from '@tradeapp/shared';
+import { NotificationBell } from '../components/NotificationBell';
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Open',
-  accepted: 'Accepted',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
+const STATUS_CONFIG: Record<string, { label: string; badge: string; icon: string }> = {
+  pending:     { label: 'Open',        badge: 'badge-amber',   icon: '🟡' },
+  accepted:    { label: 'Accepted',    badge: 'badge-navy',    icon: '🔵' },
+  in_progress: { label: 'In Progress', badge: 'badge-warning', icon: '🟠' },
+  completed:   { label: 'Completed',   badge: 'badge-success', icon: '🟢' },
+  cancelled:   { label: 'Cancelled',   badge: 'badge-danger',  icon: '🔴' },
 };
 
-const URGENCY_LABELS: Record<string, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  emergency: 'Emergency',
+const URGENCY_CONFIG: Record<string, { label: string; badge: string }> = {
+  low:       { label: 'Low priority', badge: 'badge-muted' },
+  medium:    { label: 'Medium',       badge: 'badge-amber' },
+  high:      { label: 'High',         badge: 'badge-warning' },
+  emergency: { label: 'Emergency',    badge: 'badge-danger' },
 };
+
+function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span
+          key={star}
+          onClick={() => onChange?.(star)}
+          onMouseEnter={() => onChange && setHover(star)}
+          onMouseLeave={() => onChange && setHover(0)}
+          style={{
+            fontSize: '1.75rem', lineHeight: 1,
+            color: star <= (hover || value) ? 'var(--color-amber)' : 'var(--color-border)',
+            cursor: onChange ? 'pointer' : 'default',
+            transition: 'color 0.1s',
+            userSelect: 'none',
+          }}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -109,119 +135,140 @@ export function JobDetailPage() {
 
   const isOwner = user?.id === job?.customerId;
   const isAssigned = user?.id === job?.professionalId;
+  const statusCfg = job ? (STATUS_CONFIG[job.status] ?? { label: job.status, badge: 'badge-muted', icon: '⚪' }) : null;
+  const urgencyCfg = job ? (URGENCY_CONFIG[job.urgency] ?? { label: job.urgency, badge: 'badge-muted' }) : null;
 
   return (
-    <>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <nav className="navbar">
         <div className="navbar-inner">
-          <Link to="/" className="navbar-brand">TradeApp</Link>
+          <Link to="/" className="navbar-brand">TradeApp<span className="navbar-brand-dot" /></Link>
           <div className="navbar-actions">
-            <Link to="/jobs" className="btn btn-outline">All Jobs</Link>
-            <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
-            <button className="btn btn-outline" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
+            <Link to="/jobs" className="navbar-link">Browse Jobs</Link>
+            <Link to="/my-jobs" className="navbar-link">My Jobs</Link>
+            <Link to="/dashboard" className="navbar-link">Dashboard</Link>
+            <NotificationBell />
+            <button className="btn btn-ghost btn-sm" onClick={() => { logout(); navigate('/login'); }}>Log out</button>
           </div>
         </div>
       </nav>
 
-      <div className="page" style={{ maxWidth: '720px' }}>
+      <div className="page" style={{ maxWidth: 760 }}>
         {isLoading ? (
-          <p className="text-muted">Loading...</p>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+            <span className="spinner" style={{ width: 32, height: 32 }} />
+          </div>
         ) : !job ? (
-          <p className="text-muted">Job not found.</p>
+          <div style={{ textAlign: 'center', padding: '80px 24px' }}>
+            <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔍</div>
+            <h3>Job not found</h3>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: 20 }}>This job may have been removed.</p>
+            <Link to="/jobs" className="btn btn-primary btn-sm">Back to jobs</Link>
+          </div>
         ) : (
           <>
+            {/* Breadcrumb */}
+            <div className="animate-in" style={{ marginBottom: 24, fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+              <Link to="/jobs" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>Browse jobs</Link>
+              <span style={{ margin: '0 8px' }}>›</span>
+              <span style={{ color: 'var(--color-text)' }}>{job.title}</span>
+            </div>
+
             {/* Header */}
-            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h1 style={{ marginBottom: '4px' }}>{job.title}</h1>
-                <p className="text-muted" style={{ margin: 0 }}>
-                  {job.category?.name} &middot; Posted {new Date(job.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex gap-1">
-                <span className="badge">{STATUS_LABELS[job.status]}</span>
-                <span className="badge">{URGENCY_LABELS[job.urgency]}</span>
+            <div className="animate-in" style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    {statusCfg && <span className={`badge ${statusCfg.badge}`}>{statusCfg.icon} {statusCfg.label}</span>}
+                    {urgencyCfg && <span className={`badge ${urgencyCfg.badge}`}>{urgencyCfg.label}</span>}
+                    {job.category && <span className="badge badge-muted">{job.category.name}</span>}
+                  </div>
+                  <h1 style={{ marginBottom: 6, fontSize: 'clamp(1.4rem, 3vw, 2rem)' }}>{job.title}</h1>
+                  <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                    📍 {job.address} · Posted {new Date(job.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+                {job.estimatedBudget && (
+                  <div style={{
+                    padding: '12px 20px', background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+                    textAlign: 'center', flexShrink: 0,
+                  }}>
+                    <div className="stat-label">Budget</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-navy)' }}>
+                      £{job.estimatedBudget}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            <hr className="divider" />
-
             {/* Description */}
-            <div className="card">
-              <h3>Description</h3>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{job.description}</p>
+            <div className="card animate-in animate-in-delay-1" style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 14px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Description</h4>
+              <p style={{ whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.7, color: 'var(--color-text)' }}>{job.description}</p>
             </div>
 
             {/* Details grid */}
-            <div className="card mt-2">
-              <h3>Details</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '12px' }}>
+            <div className="card animate-in animate-in-delay-1" style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 16px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Job details</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
                 <div>
-                  <div className="text-xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Address</div>
-                  <div className="text-sm">{job.address}</div>
-                </div>
-                {job.estimatedBudget && (
-                  <div>
-                    <div className="text-xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Budget</div>
-                    <div className="text-sm">${job.estimatedBudget}</div>
+                  <div className="stat-label">Posted by</div>
+                  <div className="stat-value" style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                    {job.customer?.firstName} {job.customer?.lastName}
                   </div>
-                )}
-                <div>
-                  <div className="text-xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Posted by</div>
-                  <div className="text-sm">{job.customer?.firstName} {job.customer?.lastName}</div>
                 </div>
                 {job.professional && (
                   <div>
-                    <div className="text-xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assigned to</div>
-                    <div className="text-sm">{job.professional.firstName} {job.professional.lastName} ({job.professional.averageRating.toFixed(1)} rating)</div>
+                    <div className="stat-label">Assigned to</div>
+                    <div className="stat-value" style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                      {job.professional.firstName} {job.professional.lastName}
+                      <span style={{ color: 'var(--color-amber)', marginLeft: 6, fontSize: '0.85rem' }}>
+                        {job.professional.averageRating.toFixed(1)} ★
+                      </span>
+                    </div>
                   </div>
                 )}
+                <div>
+                  <div className="stat-label">Location</div>
+                  <div className="stat-value" style={{ fontSize: '0.9rem', fontWeight: 500 }}>{job.address}</div>
+                </div>
               </div>
             </div>
 
             {/* Timeline */}
-            <div className="card mt-2">
-              <h3>Timeline</h3>
-              <div className="flex-col gap-1 mt-1">
-                <div className="text-sm">
-                  <span className="text-muted">Created:</span> {new Date(job.createdAt).toLocaleString()}
-                </div>
-                {job.acceptedAt && (
-                  <div className="text-sm">
-                    <span className="text-muted">Accepted:</span> {new Date(job.acceptedAt).toLocaleString()}
+            <div className="card animate-in animate-in-delay-2" style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 14px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Timeline</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: 'Posted', date: job.createdAt },
+                  { label: 'Accepted', date: job.acceptedAt },
+                  { label: 'Started', date: job.startedAt },
+                  { label: 'Completed', date: job.completedAt },
+                ].filter((t) => t.date).map((t) => (
+                  <div key={t.label} className="stat-row">
+                    <span className="stat-label">{t.label}</span>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--color-text)' }}>
+                      {new Date(t.date!).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
-                )}
-                {job.startedAt && (
-                  <div className="text-sm">
-                    <span className="text-muted">Started:</span> {new Date(job.startedAt).toLocaleString()}
-                  </div>
-                )}
-                {job.completedAt && (
-                  <div className="text-sm">
-                    <span className="text-muted">Completed:</span> {new Date(job.completedAt).toLocaleString()}
-                  </div>
-                )}
+                ))}
               </div>
             </div>
 
-            {/* Rating section */}
+            {/* Rating */}
             {job.status === 'completed' && (
-              <div className="card mt-2">
-                {isOwner && !existingRating && (
+              <div className="card animate-in animate-in-delay-2" style={{ marginBottom: 16 }}>
+                {isOwner && !existingRating ? (
                   <>
-                    <h3>Rate this Job</h3>
-                    <p className="text-muted text-sm">How did {job.professional?.firstName} do?</p>
+                    <h4 style={{ margin: '0 0 6px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Leave a rating</h4>
+                    <p style={{ margin: '0 0 16px', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                      How did {job.professional?.firstName} do?
+                    </p>
                     <form onSubmit={handleSubmitRating}>
-                      <div className="flex gap-1" style={{ fontSize: '28px', marginBottom: '12px', cursor: 'pointer' }}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span
-                            key={star}
-                            onClick={() => setRatingValue(star)}
-                            style={{ color: star <= ratingValue ? '#f59e0b' : '#d1d5db', userSelect: 'none' }}
-                          >
-                            ★
-                          </span>
-                        ))}
+                      <div style={{ marginBottom: 14 }}>
+                        <StarRating value={ratingValue} onChange={setRatingValue} />
                       </div>
                       <textarea
                         className="form-input"
@@ -229,73 +276,94 @@ export function JobDetailPage() {
                         value={ratingComment}
                         onChange={(e) => setRatingComment(e.target.value)}
                         rows={3}
-                        style={{ marginBottom: '12px' }}
+                        style={{ marginBottom: 14, resize: 'vertical' }}
                       />
-                      <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={ratingValue === 0 || ratingLoading}
-                      >
-                        {ratingLoading ? 'Submitting...' : 'Submit Rating'}
+                      <button type="submit" className="btn btn-primary btn-sm" disabled={ratingValue === 0 || ratingLoading}>
+                        {ratingLoading ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} /> Submitting…</> : 'Submit rating'}
                       </button>
                     </form>
                   </>
-                )}
-                {existingRating && (
+                ) : existingRating ? (
                   <>
-                    <h3>{isOwner ? 'Your Rating' : 'Customer Rating'}</h3>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span key={star} style={{ color: star <= existingRating.rating ? '#f59e0b' : '#d1d5db' }}>★</span>
-                      ))}
-                      <span className="text-muted text-sm" style={{ marginLeft: '8px' }}>{existingRating.rating}/5</span>
+                    <h4 style={{ margin: '0 0 12px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>
+                      {isOwner ? 'Your rating' : 'Customer rating'}
+                    </h4>
+                    <div style={{ marginBottom: 8 }}>
+                      <StarRating value={existingRating.rating} />
                     </div>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                      {existingRating.rating}/5 stars
+                    </p>
                     {existingRating.comment && (
-                      <p className="text-sm" style={{ margin: 0 }}>{existingRating.comment}</p>
+                      <p style={{ margin: '10px 0 0', fontSize: '0.9rem', color: 'var(--color-text)', fontStyle: 'italic' }}>
+                        "{existingRating.comment}"
+                      </p>
                     )}
                   </>
-                )}
+                ) : null}
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 mt-3">
-              {/* Professional can accept an open job */}
-              {user?.role === UserRole.PROFESSIONAL && job.status === 'pending' && (
-                <button className="btn btn-primary" onClick={handleAccept} disabled={actionLoading}>
-                  {actionLoading ? 'Accepting...' : 'Accept this job'}
-                </button>
-              )}
-
-              {/* Assigned professional can start or complete */}
-              {isAssigned && job.status === 'accepted' && (
-                <button className="btn btn-primary" onClick={() => handleStatusUpdate('in_progress')} disabled={actionLoading}>
-                  Start job
-                </button>
-              )}
-              {isAssigned && job.status === 'in_progress' && (
-                <button className="btn btn-success" onClick={() => handleStatusUpdate('completed')} disabled={actionLoading}>
-                  Mark complete
-                </button>
-              )}
-
-              {/* Either party can cancel (if not completed/cancelled) */}
-              {(isOwner || isAssigned) && !['completed', 'cancelled'].includes(job.status) && (
-                <button className="btn btn-danger" onClick={() => handleStatusUpdate('cancelled')} disabled={actionLoading}>
-                  Cancel
-                </button>
-              )}
-
-              {/* Owner can permanently remove a cancelled job */}
-              {isOwner && job.status === 'cancelled' && (
-                <button className="btn btn-danger" onClick={handleRemove} disabled={actionLoading}>
-                  Remove
-                </button>
-              )}
-            </div>
+            {(user?.role === UserRole.PROFESSIONAL || isOwner || isAssigned) && !['completed', 'cancelled'].includes(job.status) || (isOwner && job.status === 'cancelled') ? (
+              <div className="animate-in animate-in-delay-3" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {user?.role === UserRole.PROFESSIONAL && job.status === 'pending' && !isOwner && (
+                  <button className="btn btn-primary" onClick={handleAccept} disabled={actionLoading}>
+                    {actionLoading ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} /> Accepting…</> : '✓ Accept this job'}
+                  </button>
+                )}
+                {isAssigned && job.status === 'accepted' && (
+                  <button className="btn btn-primary" onClick={() => handleStatusUpdate('in_progress')} disabled={actionLoading}>
+                    ▶ Start job
+                  </button>
+                )}
+                {isAssigned && job.status === 'in_progress' && (
+                  <button
+                    onClick={() => handleStatusUpdate('completed')}
+                    disabled={actionLoading}
+                    style={{
+                      padding: '10px 20px', border: 'none', borderRadius: 'var(--radius)',
+                      background: 'var(--color-success)', color: '#fff',
+                      fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '0.9rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✓ Mark as complete
+                  </button>
+                )}
+                {(isOwner || isAssigned) && !['completed', 'cancelled'].includes(job.status) && (
+                  <button
+                    onClick={() => handleStatusUpdate('cancelled')}
+                    disabled={actionLoading}
+                    style={{
+                      padding: '10px 20px', border: '1.5px solid var(--color-danger)',
+                      borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--color-danger)',
+                      fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.9rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel job
+                  </button>
+                )}
+                {isOwner && job.status === 'cancelled' && (
+                  <button
+                    onClick={handleRemove}
+                    disabled={actionLoading}
+                    style={{
+                      padding: '10px 20px', border: 'none', borderRadius: 'var(--radius)',
+                      background: 'var(--color-danger)', color: '#fff',
+                      fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '0.9rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Remove job
+                  </button>
+                )}
+              </div>
+            ) : null}
           </>
         )}
       </div>
-    </>
+    </div>
   );
 }

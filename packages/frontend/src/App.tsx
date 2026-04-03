@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import Lenis from 'lenis';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { UserRole } from '@tradeapp/shared';
 import { HomePage } from './pages/HomePage';
@@ -11,11 +14,33 @@ import { PostJobPage } from './pages/PostJobPage';
 import { JobDetailPage } from './pages/JobDetailPage';
 import { MyJobsPage } from './pages/MyJobsPage';
 import { EditProfilePage } from './pages/EditProfilePage';
+import { LoadingScreen } from './components/LoadingScreen';
 
-function App() {
+const MIN_LOADING_MS = 2800;
+
+function AnimatedRoutes() {
+  const location = useLocation();
+  const { isLoading } = useAuth();
+  const [showLoader, setShowLoader] = useState(true);
+  const startTime = useRef(Date.now());
+
+  useEffect(() => {
+    if (!isLoading) {
+      const elapsed = Date.now() - startTime.current;
+      const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
+      const t = setTimeout(() => setShowLoader(false), remaining);
+      return () => clearTimeout(t);
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.key]);
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
+    <>
+      <LoadingScreen visible={showLoader} />
+      <div key={location.key} className="page-enter">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -70,6 +95,31 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+      </div>
+    </>
+  );
+}
+
+function App() {
+  const lenisRef = useRef<Lenis | null>(null);
+
+  useEffect(() => {
+    const lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
+    lenisRef.current = lenis;
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    return () => lenis.destroy();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AnimatedRoutes />
       </AuthProvider>
     </BrowserRouter>
   );

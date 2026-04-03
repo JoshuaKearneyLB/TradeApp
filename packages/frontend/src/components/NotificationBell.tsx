@@ -15,10 +15,21 @@ function timeAgo(date: Date): string {
 export function NotificationBell() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [shaking, setShaking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const prevUnread = useRef(unreadCount);
 
-  // Close on outside click
+  // Shake bell when new notifications arrive
+  useEffect(() => {
+    if (unreadCount > prevUnread.current) {
+      setShaking(true);
+      const t = setTimeout(() => setShaking(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevUnread.current = unreadCount;
+  }, [unreadCount]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -32,66 +43,79 @@ export function NotificationBell() {
   const handleNotificationClick = async (id: string, relatedJobId?: string) => {
     await markRead(id);
     setOpen(false);
-    if (relatedJobId) {
-      navigate(`/my-jobs`);
-    }
+    if (relatedJobId) navigate('/my-jobs');
   };
 
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
+      {/* Bell button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="btn btn-outline"
-        style={{ position: 'relative', display: 'flex', alignItems: 'center' }}
+        className={shaking ? 'bell-shake' : ''}
+        style={{
+          position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 36, height: 36, borderRadius: 'var(--radius)', border: '1px solid var(--color-border)',
+          background: open ? 'var(--color-navy)' : 'var(--color-surface)',
+          color: open ? '#fff' : 'var(--color-text-muted)',
+          cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
+        }}
         title="Notifications"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
           <span style={{
-            position: 'absolute',
-            top: '-4px',
-            right: '-4px',
-            backgroundColor: '#111',
-            color: '#fff',
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            borderRadius: '999px',
-            minWidth: '16px',
-            height: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 3px',
-            lineHeight: 1,
+            position: 'absolute', top: -4, right: -4,
+            background: 'var(--color-amber)', color: '#fff',
+            fontSize: '0.6rem', fontWeight: 800,
+            borderRadius: '999px', minWidth: 16, height: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 3px', lineHeight: 1,
+            border: '2px solid var(--color-bg)',
           }}>
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
+      {/* Dropdown */}
       {open && (
         <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 8px)',
-          right: 0,
-          width: '320px',
-          background: 'var(--color-surface, #fff)',
-          border: '1px solid var(--color-border, #e2e8f0)',
-          borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          zIndex: 1000,
-          overflow: 'hidden',
+          position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+          width: 340, background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 12px 40px rgba(27,58,92,0.15)', zIndex: 1000, overflow: 'hidden',
         }}>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--color-border, #e2e8f0)' }}>
-            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Notifications</span>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 18px', borderBottom: '1px solid var(--color-border)',
+            background: 'var(--color-surface)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text)' }}>
+                Notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  background: 'var(--color-amber)', color: '#fff',
+                  fontSize: '0.65rem', fontWeight: 800, borderRadius: '999px',
+                  padding: '1px 6px', lineHeight: 1.6,
+                }}>
+                  {unreadCount} new
+                </span>
+              )}
+            </div>
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--color-text-muted, #64748b)' }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '0.75rem', color: 'var(--color-text-muted)',
+                  fontFamily: 'var(--font-body)', fontWeight: 500, padding: 0,
+                }}
               >
                 Mark all read
               </button>
@@ -99,32 +123,49 @@ export function NotificationBell() {
           </div>
 
           {/* List */}
-          <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
             {notifications.length === 0 ? (
-              <p style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', margin: 0 }}>
-                No notifications yet
-              </p>
+              <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 10 }}>🔔</div>
+                <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                  No notifications yet
+                </p>
+              </div>
             ) : (
-              notifications.map((n) => (
+              notifications.map((n, i) => (
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n.id, n.relatedJobId)}
                   style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--color-border, #f1f5f9)',
+                    padding: '13px 18px',
+                    borderBottom: i < notifications.length - 1 ? '1px solid var(--color-border)' : 'none',
                     cursor: n.relatedJobId ? 'pointer' : 'default',
-                    backgroundColor: n.isRead ? 'transparent' : '#f5f5f5',
+                    background: n.isRead ? 'transparent' : 'rgba(232,160,32,0.06)',
+                    transition: 'background 0.15s',
+                    position: 'relative',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ fontWeight: n.isRead ? 400 : 600, fontSize: '0.875rem', flex: 1 }}>
+                  {/* Unread indicator */}
+                  {!n.isRead && (
+                    <div style={{
+                      position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)',
+                      width: 5, height: 5, borderRadius: '50%', background: 'var(--color-amber)',
+                    }} />
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <span style={{
+                      fontWeight: n.isRead ? 500 : 700,
+                      fontSize: '0.875rem', flex: 1,
+                      color: 'var(--color-text)',
+                      fontFamily: n.isRead ? 'var(--font-body)' : 'var(--font-display)',
+                    }}>
                       {n.title}
                     </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 1 }}>
                       {timeAgo(n.createdAt)}
                     </span>
                   </div>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted, #64748b)' }}>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
                     {n.content}
                   </p>
                 </div>

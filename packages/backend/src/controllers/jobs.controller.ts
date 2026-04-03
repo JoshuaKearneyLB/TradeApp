@@ -122,8 +122,8 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
          sc.name AS category_name,
          sc.description AS category_description
        FROM jobs j
-       JOIN users u ON j.customer_id = u.id
-       JOIN service_categories sc ON j.category_id = sc.id
+       LEFT JOIN users u ON j.customer_id = u.id
+       LEFT JOIN service_categories sc ON j.category_id = sc.id
        ${whereClause}
        ${orderBy}
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -421,8 +421,8 @@ export async function getMyJobs(req: AuthRequest, res: Response): Promise<void> 
          sc.name AS category_name,
          sc.description AS category_description
        FROM jobs j
-       JOIN users u ON j.customer_id = u.id
-       JOIN service_categories sc ON j.category_id = sc.id
+       LEFT JOIN users u ON j.customer_id = u.id
+       LEFT JOIN service_categories sc ON j.category_id = sc.id
        WHERE ${whereField} = $1
        ORDER BY j.created_at DESC`,
       [userId]
