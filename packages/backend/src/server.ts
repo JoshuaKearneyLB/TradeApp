@@ -20,6 +20,8 @@ import categoriesRoutes from './routes/categories.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import ratingsRoutes from './routes/ratings.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
+import paymentsRoutes from './routes/payments.routes.js';
+import { handleWebhook } from './controllers/payments.controller.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { initIO } from './socket/index.js';
 import type { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData } from '@tradeapp/shared';
@@ -72,6 +74,11 @@ app.use(cors({
   origin: corsOrigin,
   credentials: true,
 }));
+
+// Stripe webhook must receive raw body — register before express.json()
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+app.post('/api/webhooks/stripe', handleWebhook);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
@@ -111,6 +118,7 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 // Geocoding endpoint — proxies to Nominatim so frontend avoids CORS
 app.get('/api/geocode', geocodeLimiter, async (req, res) => {
@@ -285,7 +293,7 @@ async function startServer() {
     // Run pending migrations — each file is attempted independently so a
     // previously-applied migration doesn't block later ones from running.
     const migrationsDir = join(__dirname, 'db', 'migrations');
-    const migrations = ['001_initial_schema.sql', '002_add_location_display.sql', '003_add_job_started_notification_type.sql', '004_add_revoked_tokens.sql'];
+    const migrations = ['001_initial_schema.sql', '002_add_location_display.sql', '003_add_job_started_notification_type.sql', '004_add_revoked_tokens.sql', '005_add_payments.sql', '006_add_stripe_to_profiles.sql'];
     for (const file of migrations) {
       try {
         const sql = readFileSync(join(migrationsDir, file), 'utf8');

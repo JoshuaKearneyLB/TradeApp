@@ -90,11 +90,11 @@ export function HomePage() {
       {/* Hero */}
       <section style={{
         backgroundImage: `
-          linear-gradient(rgba(34,197,94,0.07) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(34,197,94,0.07) 1px, transparent 1px),
-          linear-gradient(rgba(34,197,94,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(34,197,94,0.03) 1px, transparent 1px),
-          linear-gradient(160deg, #1e2d26 0%, #2d4438 55%, #1a3328 100%)
+          linear-gradient(rgba(59,130,246,0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px),
+          linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px),
+          linear-gradient(160deg, #0d1f40 0%, #1a3a6b 55%, #0a1830 100%)
         `,
         backgroundSize: '80px 80px, 80px 80px, 16px 16px, 16px 16px, cover',
         padding: '120px 24px 100px',
@@ -108,11 +108,11 @@ export function HomePage() {
         }}>
           <div className="animate-in" style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.4)',
+            background: 'rgba(13,148,136,0.18)', border: '1px solid rgba(13,148,136,0.4)',
             borderRadius: 'var(--radius-full)', padding: '5px 14px',
             marginBottom: 28,
           }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f5c96a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#5eead4', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               🇬🇧 UK's trade marketplace
             </span>
           </div>

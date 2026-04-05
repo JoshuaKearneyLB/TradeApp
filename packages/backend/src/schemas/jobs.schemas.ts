@@ -10,7 +10,7 @@ export const createJobSchema = z.object({
     longitude: z.number().min(-180, 'Invalid longitude').max(180, 'Invalid longitude'),
   }).optional(),
   urgency: z.enum(['low', 'medium', 'high', 'emergency']).default('medium'),
-  estimatedBudget: z.number().positive('Budget must be a positive number').max(1_000_000, 'Budget cannot exceed £1,000,000').optional().nullable(),
+  estimatedBudget: z.number({ error: 'Budget is required' }).positive('Budget is required').max(1_000_000, 'Budget cannot exceed £1,000,000'),
   scheduledDate: z.string().optional().nullable().refine(
     (d) => !d || new Date(d) > new Date(),
     'Scheduled date must be in the future'

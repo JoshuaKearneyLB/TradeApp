@@ -18,7 +18,7 @@ export function LoadingScreen({ visible }: LoadingScreenProps) {
             position: 'fixed',
             inset: 0,
             zIndex: 9999,
-            background: 'linear-gradient(160deg, #1e2d26 0%, #2d4438 55%, #1a3328 100%)',
+            background: 'linear-gradient(160deg, #0d1f40 0%, #1a3a6b 55%, #0a1830 100%)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -32,7 +32,7 @@ export function LoadingScreen({ visible }: LoadingScreenProps) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
-            <TargetingUI color="#22c55e" className="w-64 h-56" />
+            <TargetingUI color="#0d9488" className="w-64 h-56" />
           </motion.div>
 
           {/* Brand name */}
@@ -55,7 +55,7 @@ export function LoadingScreen({ visible }: LoadingScreenProps) {
             <motion.span
               style={{
                 width: 7, height: 7, borderRadius: '50%',
-                background: '#22c55e',
+                background: '#0d9488',
                 display: 'inline-block',
               }}
               animate={{ opacity: [1, 0.2, 1] }}

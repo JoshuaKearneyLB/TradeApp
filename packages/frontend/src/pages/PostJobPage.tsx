@@ -56,6 +56,10 @@ export function PostJobPage() {
       setError('Please fill in all required fields');
       return;
     }
+    if (!form.estimatedBudget || Number(form.estimatedBudget) <= 0) {
+      setError('A budget is required so the tradesperson knows what to expect');
+      return;
+    }
     setIsLoading(true);
     try {
       await jobService.createJob({
@@ -64,7 +68,7 @@ export function PostJobPage() {
         description: form.description,
         address: form.address,
         urgency: form.urgency,
-        estimatedBudget: form.estimatedBudget ? Number(form.estimatedBudget) : undefined,
+        estimatedBudget: Number(form.estimatedBudget),
         location: geocodedLocation ?? undefined,
       });
       navigate('/my-jobs');
@@ -208,7 +212,7 @@ export function PostJobPage() {
             <h4 style={{ margin: '0 0 16px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.08em' }}>Budget</h4>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="estimatedBudget" className="form-label">
-                Estimated budget <span style={{ color: 'var(--color-text-light)', fontWeight: 400 }}>(optional)</span>
+                Budget <span style={{ color: 'var(--color-danger)' }}>*</span>
               </label>
               <div style={{ position: 'relative' }}>
                 <span style={{
@@ -223,7 +227,7 @@ export function PostJobPage() {
                 />
               </div>
               <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
-                Helps tradespeople know if the work is within their range. You can leave this blank.
+                The fixed price you'll pay on completion. A 10% platform fee is included.
               </p>
             </div>
           </div>

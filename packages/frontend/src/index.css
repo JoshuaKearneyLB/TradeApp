@@ -2,8 +2,8 @@
 
 /* ============================================================
    TradeApp — Design System
-   Theme: British Trade Marketplace — warm, trustworthy, premium
-   Fonts: Bricolage Grotesque (headings) + DM Sans (body)
+   Theme: British Trade Marketplace — clean, trustworthy, professional
+   Fonts: Outfit (headings) + Nunito Sans (body)
    ============================================================ */
 
 *, *::before, *::after {
@@ -11,25 +11,26 @@
 }
 
 :root {
-  /* Core palette — Slate + Electric Green */
-  --color-bg:           #f4f6f5;
+  /* Core palette — White + Navy Blue */
+  --color-bg:           #f0f5ff;
   --color-surface:      #ffffff;
-  --color-surface-2:    #edf0ee;
-  --color-border:       #dce1dd;
-  --color-border-strong:#bfc8c1;
+  --color-surface-2:    #e8effc;
+  --color-border:       #cdd8f0;
+  --color-border-strong:#9ab0d8;
 
-  /* Brand — dark slate primary, electric green accent */
-  --color-navy:         #1e2d26;
-  --color-navy-dark:    #111d18;
-  --color-navy-light:   #2d4438;
-  --color-amber:        #22c55e;
-  --color-amber-dark:   #16a34a;
-  --color-amber-light:  #dcfce7;
+  /* Brand — deep navy blue primary, teal accent */
+  /* Note: --color-warning intentionally stays amber/gold as a semantic warning colour */
+  --color-navy:         #1a3a6b;
+  --color-navy-dark:    #0f2347;
+  --color-navy-light:   #2a518a;
+  --color-amber:        #0d9488;
+  --color-amber-dark:   #0f766e;
+  --color-amber-light:  #ccfbf1;
 
   /* Text */
-  --color-text:         #111a14;
-  --color-text-muted:   #4a5c50;
-  --color-text-light:   #7a9080;
+  --color-text:         #0f1e35;
+  --color-text-muted:   #4a6080;
+  --color-text-light:   #7090ae;
   --color-text-inverse: #ffffff;
 
   /* Semantic */
@@ -53,14 +54,14 @@
   --radius-full: 9999px;
 
   /* Elevation */
-  --shadow-sm:  0 1px 3px rgba(30,45,38,0.07);
-  --shadow:     0 2px 10px rgba(30,45,38,0.09);
-  --shadow-md:  0 4px 20px rgba(30,45,38,0.12);
-  --shadow-lg:  0 8px 40px rgba(30,45,38,0.15);
+  --shadow-sm:  0 1px 3px rgba(15,35,70,0.07);
+  --shadow:     0 2px 10px rgba(15,35,70,0.09);
+  --shadow-md:  0 4px 20px rgba(15,35,70,0.12);
+  --shadow-lg:  0 8px 40px rgba(15,35,70,0.15);
 
   /* Typography */
-  --font-display: 'Bricolage Grotesque', Georgia, serif;
-  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body:    'Nunito Sans', system-ui, sans-serif;
 
   font-family: var(--font-body);
   font-size: 16px;
@@ -221,14 +222,14 @@ a:hover { color: var(--color-navy-dark); }
   background: var(--color-navy);
   color: #fff;
   border-color: var(--color-navy);
-  box-shadow: 0 2px 8px rgba(30,45,38,0.25);
+  box-shadow: 0 2px 8px rgba(15,35,70,0.25);
 }
 .btn-primary:hover {
   background: var(--color-navy-dark);
   border-color: var(--color-navy-dark);
   color: #fff;
   text-decoration: none;
-  box-shadow: 0 6px 20px rgba(30,45,38,0.38);
+  box-shadow: 0 6px 20px rgba(15,35,70,0.32);
   transform: translateY(-1px);
 }
 
@@ -236,14 +237,14 @@ a:hover { color: var(--color-navy-dark); }
   background: var(--color-amber);
   color: #fff;
   border-color: var(--color-amber);
-  box-shadow: 0 2px 8px rgba(34,197,94,0.3);
+  box-shadow: 0 2px 8px rgba(13,148,136,0.3);
 }
 .btn-accent:hover {
   background: var(--color-amber-dark);
   border-color: var(--color-amber-dark);
   color: #fff;
   text-decoration: none;
-  box-shadow: 0 6px 24px rgba(34,197,94,0.45);
+  box-shadow: 0 6px 24px rgba(13,148,136,0.45);
   transform: translateY(-1px);
 }
 
@@ -354,7 +355,7 @@ a:hover { color: var(--color-navy-dark); }
 .form-select:focus,
 .form-textarea:focus {
   border-color: var(--color-navy);
-  box-shadow: 0 0 0 3px rgba(30,45,38,0.10), 0 1px 6px rgba(30,45,38,0.08);
+  box-shadow: 0 0 0 3px rgba(26,58,107,0.12), 0 1px 6px rgba(26,58,107,0.08);
   background: #fff;
 }
 
@@ -407,8 +408,8 @@ a:hover { color: var(--color-navy-dark); }
 }
 
 .alert-info {
-  background: #eaf5ee;
-  border: 1px solid rgba(34,197,94,0.2);
+  background: #e8effc;
+  border: 1px solid rgba(26,58,107,0.2);
   color: var(--color-navy);
 }
 
@@ -431,7 +432,7 @@ a:hover { color: var(--color-navy-dark); }
 }
 .navbar.scrolled {
   background: rgba(255,255,255,0.97);
-  box-shadow: 0 2px 24px rgba(30,45,38,0.13);
+  box-shadow: 0 2px 24px rgba(15,35,70,0.12);
   border-bottom-color: var(--color-border-strong);
 }
 
@@ -466,8 +467,8 @@ a:hover { color: var(--color-navy-dark); }
   animation: dotPulse 3.5s ease-in-out infinite;
 }
 @keyframes dotPulse {
-  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
-  50%       { transform: scale(1.3); box-shadow: 0 0 0 5px rgba(34,197,94,0);  }
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(13,148,136,0.5); }
+  50%       { transform: scale(1.3); box-shadow: 0 0 0 5px rgba(13,148,136,0);  }
 }
 
 .navbar-actions {
@@ -514,15 +515,15 @@ a:hover { color: var(--color-navy-dark); }
 }
 
 .badge-navy {
-  background: #eaf5ee;
-  border: 1px solid rgba(34,197,94,0.2);
+  background: #e8effc;
+  border: 1px solid rgba(26,58,107,0.2);
   color: var(--color-navy);
 }
 
 .badge-amber {
   background: var(--color-amber-light);
-  border: 1px solid rgba(34,197,94,0.3);
-  color: #166534;
+  border: 1px solid rgba(13,148,136,0.3);
+  color: #134e4a;
 }
 
 .badge-success {
@@ -697,8 +698,8 @@ a:hover { color: var(--color-navy-dark); }
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: #eef3fa;
-  border: 1px solid rgba(30,45,38,0.2);
+  background: #e8effc;
+  border: 1px solid rgba(26,58,107,0.2);
   border-radius: var(--radius-full);
   font-size: 0.875rem;
   font-weight: 500;

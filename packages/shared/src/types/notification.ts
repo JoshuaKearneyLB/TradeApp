@@ -5,6 +5,7 @@ export enum NotificationType {
   JOB_COMPLETED = 'job_completed',
   MESSAGE = 'message',
   RATING = 'rating',
+  PAYMENT_RECEIVED = 'payment_received',
 }
 
 export interface Notification {

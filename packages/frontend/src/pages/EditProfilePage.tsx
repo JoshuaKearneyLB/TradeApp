@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getOnboardingStatus, onboardProfessional } from '../services/paymentService';
 
 function validatePhone(phone: string): string {
   if (!phone.trim()) return '';
@@ -40,6 +41,9 @@ export function EditProfilePage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [stripeComplete, setStripeComplete] = useState<boolean | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [searchParams] = useSearchParams();
 
   const isPro = user?.role === UserRole.PROFESSIONAL;
 
@@ -68,7 +72,20 @@ export function EditProfilePage() {
     if (!isPro) return;
     jobService.getCategories().then(setCategories).catch(console.error);
     profileService.getSkills().then((data) => setSkills(data.skills)).catch(console.error);
-  }, [isPro]);
+    getOnboardingStatus()
+      .then(({ complete }) => setStripeComplete(complete))
+      .catch(() => setStripeComplete(false));
+  }, [isPro, searchParams]);
+
+  const handleConnectStripe = async () => {
+    setStripeLoading(true);
+    try {
+      const { url } = await onboardProfessional();
+      window.location.href = url;
+    } catch {
+      setStripeLoading(false);
+    }
+  };
 
   const handleBasicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBasic({ ...basic, [e.target.name]: e.target.value });
@@ -170,9 +187,46 @@ export function EditProfilePage() {
             <div style={{
               padding: '14px 18px', marginBottom: 20, borderRadius: 'var(--radius)',
               background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
-              color: '#166534', fontSize: '0.875rem', fontWeight: 600,
+              color: '#0f766e', fontSize: '0.875rem', fontWeight: 600,
             }}>
               ✓ {success}
+            </div>
+          )}
+
+          {/* Stripe Connect banner — professionals only */}
+          {isPro && stripeComplete !== null && (
+            <div style={{
+              padding: '16px 18px', marginBottom: 20, borderRadius: 'var(--radius)',
+              background: stripeComplete ? 'rgba(13,148,136,0.08)' : 'rgba(13,148,136,0.06)',
+              border: `1px solid ${stripeComplete ? 'rgba(13,148,136,0.3)' : 'rgba(13,148,136,0.25)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: stripeComplete ? '#0f766e' : '#0f766e', marginBottom: 2 }}>
+                  {stripeComplete ? '✓ Payments enabled' : '💳 Connect your bank account'}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: stripeComplete ? '#0f766e' : '#0f766e', opacity: 0.85 }}>
+                  {stripeComplete
+                    ? 'You will receive payouts directly to your bank account.'
+                    : 'Required to receive payments from customers.'}
+                </div>
+              </div>
+              {!stripeComplete && (
+                <button
+                  type="button"
+                  onClick={handleConnectStripe}
+                  disabled={stripeLoading}
+                  style={{
+                    padding: '8px 16px', border: 'none', borderRadius: 'var(--radius)',
+                    background: '#0d9488', color: '#fff',
+                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '0.85rem',
+                    cursor: stripeLoading ? 'default' : 'pointer',
+                    opacity: stripeLoading ? 0.7 : 1, flexShrink: 0,
+                  }}
+                >
+                  {stripeLoading ? 'Redirecting…' : 'Connect with Stripe'}
+                </button>
+              )}
             </div>
           )}
 
@@ -287,7 +341,7 @@ export function EditProfilePage() {
                     background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
                     borderRadius: 'var(--radius)',
                   }}>
-                    <span style={{ fontSize: '0.875rem', flex: 1, color: '#166534', fontWeight: 500 }}>
+                    <span style={{ fontSize: '0.875rem', flex: 1, color: '#0f766e', fontWeight: 500 }}>
                       📍 {locationDisplay}
                     </span>
                     <button
@@ -295,7 +349,7 @@ export function EditProfilePage() {
                       onClick={handleLocationClear}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#166534', fontSize: '1.1rem', padding: '0 2px', lineHeight: 1,
+                        color: '#0f766e', fontSize: '1.1rem', padding: '0 2px', lineHeight: 1,
                       }}
                       title="Remove location"
                     >

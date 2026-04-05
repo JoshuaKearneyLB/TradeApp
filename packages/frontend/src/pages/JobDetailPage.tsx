@@ -5,6 +5,9 @@ import { jobService } from '../services/jobService';
 import type { JobResponse } from '../services/jobService';
 import { ratingService } from '../services/ratingService';
 import type { RatingResponse } from '../services/ratingService';
+import { getJobPayment, createPaymentIntent } from '../services/paymentService';
+import type { Payment } from '../services/paymentService';
+import { PaymentModal } from '../components/PaymentModal';
 import { UserRole } from '@tradeapp/shared';
 import { NotificationBell } from '../components/NotificationBell';
 
@@ -59,6 +62,8 @@ export function JobDetailPage() {
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [ratingLoading, setRatingLoading] = useState(false);
+  const [payment, setPayment] = useState<Payment | null>(null);
+  const [paymentModal, setPaymentModal] = useState<{ clientSecret: string; amountPence: number } | null>(null);
 
   const fetchJob = async () => {
     if (!id) return;
@@ -66,8 +71,12 @@ export function JobDetailPage() {
       const data = await jobService.getJobById(id);
       setJob(data);
       if (data.status === 'completed') {
-        const { rating } = await ratingService.getJobRating(id);
+        const [{ rating }, existingPayment] = await Promise.all([
+          ratingService.getJobRating(id),
+          getJobPayment(id),
+        ]);
         setExistingRating(rating);
+        setPayment(existingPayment);
       }
     } catch (error) {
       console.error('Failed to load job:', error);
@@ -128,6 +137,19 @@ export function JobDetailPage() {
       navigate('/my-jobs');
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to remove job');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePayNow = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      const { clientSecret, amount } = await createPaymentIntent(id);
+      setPaymentModal({ clientSecret, amountPence: amount });
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to initiate payment');
     } finally {
       setActionLoading(false);
     }
@@ -304,6 +326,36 @@ export function JobDetailPage() {
               </div>
             )}
 
+            {/* Payment — owner sees this when job is completed */}
+            {isOwner && job.status === 'completed' && (
+              <div className="animate-in animate-in-delay-3" style={{ marginBottom: 16 }}>
+                {payment?.status === 'succeeded' ? (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '10px 18px', borderRadius: 'var(--radius)',
+                    background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.35)',
+                    color: '#166534', fontWeight: 700, fontSize: '0.9rem',
+                  }}>
+                    ✓ Paid — £{Number(job.estimatedBudget).toFixed(2)}
+                  </div>
+                ) : (
+                  <button
+                    onClick={handlePayNow}
+                    disabled={actionLoading}
+                    style={{
+                      padding: '12px 24px', border: 'none', borderRadius: 'var(--radius)',
+                      background: 'var(--color-success)', color: '#fff',
+                      fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '0.95rem',
+                      cursor: actionLoading ? 'default' : 'pointer',
+                      opacity: actionLoading ? 0.7 : 1,
+                    }}
+                  >
+                    {actionLoading ? 'Loading…' : `Pay now — £${Number(job.estimatedBudget).toFixed(2)}`}
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Actions */}
             {(user?.role === UserRole.PROFESSIONAL || isOwner || isAssigned) && !['completed', 'cancelled'].includes(job.status) || (isOwner && job.status === 'cancelled') ? (
               <div className="animate-in animate-in-delay-3" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -364,6 +416,20 @@ export function JobDetailPage() {
           </>
         )}
       </div>
+
+      {paymentModal && job && (
+        <PaymentModal
+          jobId={job.id}
+          jobTitle={job.title}
+          clientSecret={paymentModal.clientSecret}
+          amountPence={paymentModal.amountPence}
+          onSuccess={() => {
+            setPaymentModal(null);
+            setPayment({ id: '', jobId: job.id, amount: Number(job.estimatedBudget), platformFee: 0, professionalPayout: 0, status: 'succeeded', createdAt: new Date().toISOString() });
+          }}
+          onClose={() => setPaymentModal(null)}
+        />
+      )}
     </div>
   );
 }
