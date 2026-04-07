@@ -45,4 +45,12 @@ export const socketService = {
   ) {
     socket?.off(event as string, handler as any);
   },
+
+  joinJobRoom(jobId: string) {
+    socket?.emit('join_job_room', jobId);
+  },
+
+  leaveJobRoom(jobId: string) {
+    socket?.emit('leave_job_room', jobId);
+  },
 };

@@ -1,0 +1,5 @@
+-- INFO-01: Admin credentials are no longer seeded here.
+-- The admin account is created at server startup from the ADMIN_EMAIL and
+-- ADMIN_INITIAL_PASSWORD environment variables (see server.ts seedAdmin()).
+-- This file is intentionally left as a no-op migration so the migration
+-- sequence numbers remain intact.

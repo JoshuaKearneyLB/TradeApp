@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { AuthRequest } from '../middleware/auth.js';
 import { getIO } from '../socket/index.js';
 import { NotificationType } from '@tradeapp/shared';
+import { sendJobAcceptedEmail, sendJobCompletedEmail } from '../services/email.service.js';
 
 export async function createJob(req: AuthRequest, res: Response): Promise<void> {
   try {
@@ -296,6 +297,13 @@ export async function acceptJob(req: AuthRequest, res: Response): Promise<void> 
       createdAt: notif.created_at.toISOString(),
     });
 
+    // Email the customer
+    const custResult = await query('SELECT email, first_name, last_name FROM users WHERE id = $1', [job.customer_id]);
+    if (custResult.rows.length > 0) {
+      const cust = custResult.rows[0];
+      sendJobAcceptedEmail(cust.email, `${cust.first_name} ${cust.last_name}`, proName, job.title, id);
+    }
+
     res.json(formatJob(acceptedJob));
   } catch (error) {
     console.error('Accept job error:', error);
@@ -390,6 +398,14 @@ export async function updateJobStatus(req: AuthRequest, res: Response): Promise<
         relatedJobId: id,
         createdAt: notif.created_at.toISOString(),
       });
+
+      if (status === 'completed') {
+        const custResult = await query('SELECT email, first_name, last_name FROM users WHERE id = $1', [job.customer_id]);
+        if (custResult.rows.length > 0) {
+          const cust = custResult.rows[0];
+          sendJobCompletedEmail(cust.email, `${cust.first_name} ${cust.last_name}`, job.title, id);
+        }
+      }
     }
 
     res.json(formatJob(result.rows[0]));

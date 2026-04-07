@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"FormData\\\\|multipart\\\\|upload\\\\|image\\\\|file\" /c/Users/Joshua/TradeApp/packages/frontend/src/services/*.ts)",
+      "Read(//c/Users/Joshua/TradeApp/**)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"import\\('bcrypt'\\).then\\(b => b.default.hash\\('TradeApp@Admin2026!', 10\\).then\\(h => console.log\\(h\\)\\)\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('main',''\\), d.get\\('exports',''\\), d.get\\('types',''\\)\\)\")",
+      "Bash(npm run:*)",
+      "Bash(timeout 12 npx tsx src/server.ts)",
+      "Bash(npx tsx:*)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(kill %1)",
+      "Bash(python3 -m pip install python-docx)",
+      "Bash(python3 generate_audit_doc.py)",
+      "Bash(python3 -c \"from docx.shared import RGBColor; c = RGBColor\\(0x1a, 0x3a, 0x6b\\); print\\(dir\\(c\\)\\); print\\(hex\\(c\\)\\)\")",
+      "Bash(python3 -c \"from docx.shared import RGBColor; c = RGBColor\\(0x1a, 0x3a, 0x6b\\); print\\(c[0], c[1], c[2]\\)\")",
+      "Bash(python3 -c ':*)"
+    ]
+  }
+}

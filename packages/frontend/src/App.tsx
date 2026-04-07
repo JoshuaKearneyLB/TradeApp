@@ -4,6 +4,7 @@ import Lenis from 'lenis';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AdminRoute } from './components/auth/AdminRoute';
 import { UserRole } from '@tradeapp/shared';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -14,6 +15,7 @@ import { PostJobPage } from './pages/PostJobPage';
 import { JobDetailPage } from './pages/JobDetailPage';
 import { MyJobsPage } from './pages/MyJobsPage';
 import { EditProfilePage } from './pages/EditProfilePage';
+import { AdminPage } from './pages/AdminPage';
 import { LoadingScreen } from './components/LoadingScreen';
 
 const MIN_LOADING_MS = 2800;
@@ -91,6 +93,14 @@ function AnimatedRoutes() {
               <ProtectedRoute>
                 <EditProfilePage />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminPage />
+              </AdminRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />

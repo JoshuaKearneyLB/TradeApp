@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { AuthRequest } from '../middleware/auth.js';
 import { getIO } from '../socket/index.js';
 import { NotificationType } from '@tradeapp/shared';
+import { sendPaymentReceivedEmail } from '../services/email.service.js';
 import {
   createConnectedAccount,
   createOnboardingLink,
@@ -223,6 +224,19 @@ export async function confirmPayment(req: AuthRequest, res: Response): Promise<v
       relatedJobId: jobId,
       createdAt: notif.created_at.toISOString(),
     });
+
+    // Email the professional
+    const proUserResult = await query('SELECT email, first_name, last_name FROM users WHERE id = $1', [job.professional_id]);
+    if (proUserResult.rows.length > 0) {
+      const proUser = proUserResult.rows[0];
+      sendPaymentReceivedEmail(
+        proUser.email,
+        `${proUser.first_name} ${proUser.last_name}`,
+        job.title,
+        Number(job.estimated_budget),
+        jobId,
+      );
+    }
 
     res.json({ success: true });
   } catch (error) {

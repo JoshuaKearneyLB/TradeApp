@@ -8,6 +8,8 @@ import type { RatingResponse } from '../services/ratingService';
 import { getJobPayment, createPaymentIntent } from '../services/paymentService';
 import type { Payment } from '../services/paymentService';
 import { PaymentModal } from '../components/PaymentModal';
+import { ChatPanel } from '../components/ChatPanel';
+import { PhotoGallery } from '../components/PhotoGallery';
 import { UserRole } from '@tradeapp/shared';
 import { NotificationBell } from '../components/NotificationBell';
 
@@ -258,6 +260,31 @@ export function JobDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Photos */}
+            <div className="card animate-in animate-in-delay-2" style={{ marginBottom: 16 }}>
+              <PhotoGallery jobId={job.id} jobStatus={job.status} />
+            </div>
+
+            {/* Chat — visible when accepted/in_progress/completed and both parties are set */}
+            {['accepted', 'in_progress', 'completed'].includes(job.status) && job.professionalId && (
+              <div className="animate-in animate-in-delay-2" style={{ marginBottom: 16 }}>
+                {isOwner && (
+                  <ChatPanel
+                    jobId={job.id}
+                    receiverId={job.professionalId}
+                    receiverName={`${job.professional?.firstName} ${job.professional?.lastName}`}
+                  />
+                )}
+                {isAssigned && job.customerId && (
+                  <ChatPanel
+                    jobId={job.id}
+                    receiverId={job.customerId}
+                    receiverName={`${job.customer?.firstName} ${job.customer?.lastName}`}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Timeline */}
             <div className="card animate-in animate-in-delay-2" style={{ marginBottom: 16 }}>
