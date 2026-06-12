@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Lenis from 'lenis';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { UserRole } from '@tradeapp/shared';
@@ -18,7 +19,9 @@ import { EditProfilePage } from './pages/EditProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { LoadingScreen } from './components/LoadingScreen';
 
-const MIN_LOADING_MS = 2800;
+// UX-05: keep a brief branded splash without forcing users to wait ~3s on
+// every load. Only gates the very first paint while auth state resolves.
+const MIN_LOADING_MS = 1200;
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -128,9 +131,11 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AnimatedRoutes />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AnimatedRoutes />
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

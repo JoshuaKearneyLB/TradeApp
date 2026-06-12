@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { query } from '../config/database.js';
 import { AuthRequest } from '../middleware/auth.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getNotifications(req: AuthRequest, res: Response): Promise<void> {
   try {
     const userId = req.user!.userId;
@@ -35,6 +37,11 @@ export async function markRead(req: AuthRequest, res: Response): Promise<void> {
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
+    // SEC-AUTHZ-13: reject malformed ids before hitting the DB
+    if (!UUID_RE.test(id)) {
+      res.status(400).json({ error: 'Invalid notification ID' });
+      return;
+    }
     await query(
       'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2',
       [id, userId]

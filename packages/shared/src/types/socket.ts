@@ -20,6 +20,17 @@ export interface ServerToClientEvents {
   error: (data: { message: string }) => void;
 }
 
+// Server ↔ Server events — unused today but required to fully parameterise the
+// Socket.IO Server<...> generic (previously imported but never defined).
+export interface InterServerEvents {
+  ping: () => void;
+}
+
+// Per-connection state attached to socket.data. Populated on authentication.
+export interface SocketData {
+  userId?: string;
+}
+
 // Socket event data types
 export interface NewJobMatchData {
   jobId: string;

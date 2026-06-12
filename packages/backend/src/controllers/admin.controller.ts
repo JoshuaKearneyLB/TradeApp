@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { query } from '../config/database.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { getIO } from '../socket/index.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -128,6 +129,19 @@ export async function updateUserStatus(req: AuthRequest, res: Response): Promise
     }
 
     await query('UPDATE users SET account_status = $1 WHERE id = $2', [accountStatus, id]);
+
+    // SEC-AUTH-02 / SOCK-06: HTTP requests already re-check account_status on
+    // every call, but an established socket was authenticated once and would
+    // otherwise keep working. Forcibly drop the suspended/deleted user's live
+    // sockets so the suspension takes effect immediately.
+    if (accountStatus === 'suspended' || accountStatus === 'deleted') {
+      try {
+        getIO().in(`user:${id}`).disconnectSockets(true);
+      } catch (e) {
+        console.error('Failed to disconnect sockets for suspended user:', e);
+      }
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Admin update user status error:', error);

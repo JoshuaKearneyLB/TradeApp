@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { NotificationBell } from '../components/NotificationBell';
 import { jobService } from '../services/jobService';
 import type { JobResponse } from '../services/jobService';
@@ -24,6 +25,7 @@ const URGENCY_CONFIG: Record<string, { label: string; badge: string }> = {
 
 export function MyJobsPage() {
   const { user, logout } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +54,7 @@ export function MyJobsPage() {
       await jobService.updateJobStatus(jobId, 'cancelled');
       fetchJobs();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cancel job');
+      toast.error(err.response?.data?.error || 'Failed to cancel job');
     }
   };
 
@@ -62,7 +64,7 @@ export function MyJobsPage() {
       await jobService.deleteJob(jobId);
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to remove job');
+      toast.error(err.response?.data?.error || 'Failed to remove job');
     }
   };
 
@@ -71,7 +73,7 @@ export function MyJobsPage() {
       await jobService.updateJobStatus(jobId, status);
       fetchJobs();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      toast.error(err.response?.data?.error || 'Failed to update status');
     }
   };
 

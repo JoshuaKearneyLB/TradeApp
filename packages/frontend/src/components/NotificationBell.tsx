@@ -20,14 +20,17 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const prevUnread = useRef(unreadCount);
 
-  // Shake bell when new notifications arrive
+  // Shake bell when new notifications arrive.
+  // CQ-UI-01: the baseline ref must advance on EVERY change, otherwise after the
+  // first increase it stays stale and every later count is compared against it.
   useEffect(() => {
-    if (unreadCount > prevUnread.current) {
+    const increased = unreadCount > prevUnread.current;
+    prevUnread.current = unreadCount;
+    if (increased) {
       setShaking(true);
       const t = setTimeout(() => setShaking(false), 700);
       return () => clearTimeout(t);
     }
-    prevUnread.current = unreadCount;
   }, [unreadCount]);
 
   useEffect(() => {

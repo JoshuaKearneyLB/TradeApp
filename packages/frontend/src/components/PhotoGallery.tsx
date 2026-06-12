@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { uploadService } from '../services/uploadService';
 import type { JobPhoto } from '../services/uploadService';
 
@@ -20,43 +21,55 @@ interface DisplayPhoto extends JobPhoto {
 
 export function PhotoGallery({ jobId, jobStatus }: PhotoGalleryProps) {
   const { user } = useAuth();
+  const toast = useToast();
   const [photos, setPhotos] = useState<DisplayPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<DisplayPhoto | null>(null);
   const [uploadType, setUploadType] = useState<'problem' | 'completion'>('problem');
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const blobUrlsRef = useRef<string[]>([]);
 
   const canUpload = ['pending', 'accepted', 'in_progress', 'completed'].includes(jobStatus);
 
-  // Revoke all blob URLs on unmount to avoid memory leaks
+  // CQ-UI-02: load photos for the current job and revoke the blob URLs we
+  // created when the job changes or the component unmounts. The previous code
+  // only revoked on unmount, leaking every blob URL each time jobId changed.
   useEffect(() => {
-    return () => {
-      blobUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
-    };
-  }, []);
+    let cancelled = false;
+    const created: string[] = [];
+    setLoading(true);
+    setFailedIds(new Set());
 
-  async function resolvePhotos(raw: JobPhoto[]): Promise<DisplayPhoto[]> {
-    return Promise.all(
-      raw.map(async (p) => {
-        try {
-          const blobUrl = await uploadService.fetchPhotoBlob(p.url);
-          blobUrlsRef.current.push(blobUrl);
-          return { ...p, blobUrl };
-        } catch {
-          return p; // fallback — blobUrl undefined, img will be broken (acceptable)
-        }
-      }),
-    );
-  }
-
-  useEffect(() => {
     uploadService.getJobPhotos(jobId)
-      .then(resolvePhotos)
-      .then(setPhotos)
+      .then(async (raw: JobPhoto[]) => {
+        const resolved = await Promise.all(
+          raw.map(async (p) => {
+            try {
+              const blobUrl = await uploadService.fetchPhotoBlob(p.url);
+              created.push(blobUrl);
+              return { ...p, blobUrl } as DisplayPhoto;
+            } catch {
+              return p as DisplayPhoto; // blobUrl undefined → fallback tile
+            }
+          }),
+        );
+        if (cancelled) {
+          created.forEach((u) => URL.revokeObjectURL(u));
+          return;
+        }
+        blobUrlsRef.current = created;
+        setPhotos(resolved);
+      })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => {
+      cancelled = true;
+      blobUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      blobUrlsRef.current = [];
+    };
   }, [jobId]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,7 +82,7 @@ export function PhotoGallery({ jobId, jobStatus }: PhotoGalleryProps) {
       if (blobUrl) blobUrlsRef.current.push(blobUrl);
       setPhotos((prev) => [...prev, { ...photo, blobUrl }]);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Upload failed');
+      toast.error(err.response?.data?.error || 'Upload failed');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -80,10 +93,18 @@ export function PhotoGallery({ jobId, jobStatus }: PhotoGalleryProps) {
     if (!confirm('Remove this photo?')) return;
     try {
       await uploadService.deletePhoto(photoId);
-      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      setPhotos((prev) => {
+        // CQ-UI-02: revoke the deleted photo's blob URL so it isn't leaked
+        const target = prev.find((p) => p.id === photoId);
+        if (target?.blobUrl) {
+          URL.revokeObjectURL(target.blobUrl);
+          blobUrlsRef.current = blobUrlsRef.current.filter((u) => u !== target.blobUrl);
+        }
+        return prev.filter((p) => p.id !== photoId);
+      });
       if (lightbox?.id === photoId) setLightbox(null);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete');
+      toast.error(err.response?.data?.error || 'Failed to delete');
     }
   };
 
@@ -144,11 +165,24 @@ export function PhotoGallery({ jobId, jobStatus }: PhotoGalleryProps) {
               style={{ position: 'relative', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', aspectRatio: '1' }}
               onClick={() => setLightbox(photo)}
             >
-              <img
-                src={photo.blobUrl}
-                alt={photo.originalName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
+              {photo.blobUrl && !failedIds.has(photo.id) ? (
+                <img
+                  src={photo.blobUrl}
+                  alt={photo.originalName}
+                  onError={() => setFailedIds((prev) => new Set(prev).add(photo.id))}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                // UX-04: graceful fallback instead of a broken-image icon
+                <div style={{
+                  width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 4,
+                  background: 'var(--color-bg, #eef2f9)', color: 'var(--color-text-muted, #7090ae)',
+                }}>
+                  <span style={{ fontSize: '1.4rem' }}>🖼️</span>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 600 }}>Unavailable</span>
+                </div>
+              )}
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
                 padding: '4px 8px',

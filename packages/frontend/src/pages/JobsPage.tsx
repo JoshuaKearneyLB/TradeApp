@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { jobService } from '../services/jobService';
 import type { JobResponse, Category } from '../services/jobService';
 import { MapView } from '../components/MapView';
@@ -15,6 +16,7 @@ const URGENCY_CONFIG: Record<string, { label: string; badge: string }> = {
 
 export function JobsPage() {
   const { user, professionalProfile, logout } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobResponse[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -55,7 +57,7 @@ export function JobsPage() {
       await jobService.acceptJob(jobId);
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to accept job');
+      toast.error(err.response?.data?.error || 'Failed to accept job');
     }
   };
 

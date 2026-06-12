@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { adminService } from '../services/adminService';
 import type { AdminStats, AdminUser, AdminJob, AdminPayment } from '../services/adminService';
 import { NotificationBell } from '../components/NotificationBell';
@@ -65,6 +66,7 @@ function RoleBadge({ role }: { role: string }) {
 
 export function AdminPage() {
   const { logout } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('users');
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -126,7 +128,7 @@ export function AdminPage() {
       await adminService.updateUserStatus(userId, status);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, accountStatus: status } : u));
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      toast.error(err.response?.data?.error || 'Failed to update status');
     }
   };
 

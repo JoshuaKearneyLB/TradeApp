@@ -27,11 +27,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
+    const status = error.response?.status;
+    const url: string = error.config?.url || '';
+    // UX-03: a 401 from the login/register call itself just means bad
+    // credentials — let the form show that inline rather than redirecting.
+    const isAuthAttempt = url.includes('/auth/login') || url.includes('/auth/register');
+
+    if (status === 401 && !isAuthAttempt) {
+      // Session expired or token revoked — clear it and bounce to login,
+      // but never loop if we're already on the login page.
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login?expired=1');
+      }
     }
     return Promise.reject(error);
   }

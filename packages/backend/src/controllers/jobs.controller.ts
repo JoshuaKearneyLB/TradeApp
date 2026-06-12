@@ -136,7 +136,16 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
       params.slice(0, params.length - 2)
     );
 
-    const jobs = result.rows.map(formatJobWithDetails);
+    // SEC-AUTHZ-10: in the public browse listing, coarsen location and withhold
+    // the precise address for any job the viewer does not own.
+    const viewerId = req.user!.userId;
+    const jobs = result.rows.map((row: any) => {
+      const formatted = formatJobWithDetails(row);
+      if (row.customer_id !== viewerId) {
+        return { ...formatted, address: undefined, location: coarsenLocation(formatted.location) };
+      }
+      return formatted;
+    });
 
     res.json({
       jobs,
@@ -151,6 +160,21 @@ export async function getJobs(req: AuthRequest, res: Response): Promise<void> {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * SEC-AUTHZ-10: a customer's exact street address and precise lat/lng must not
+ * be exposed to every authenticated user browsing the marketplace. For viewers
+ * who are NOT a participant on the job, round coordinates to ~1km and withhold
+ * the precise address. Full detail is only revealed once a professional accepts
+ * (and thereby becomes a participant).
+ */
+function coarsenLocation(
+  location: { latitude: number; longitude: number } | null,
+): { latitude: number; longitude: number } | null {
+  if (!location) return null;
+  const round = (n: number) => Math.round(n * 100) / 100; // 2 dp ≈ 1.1 km
+  return { latitude: round(location.latitude), longitude: round(location.longitude) };
+}
 
 export async function getJobById(req: AuthRequest, res: Response): Promise<void> {
   try {
@@ -194,8 +218,12 @@ export async function getJobById(req: AuthRequest, res: Response): Promise<void>
       requestingUserId === row.customer_id ||
       requestingUserId === row.professional_id;
 
+    const base = formatJob(row);
     const job = {
-      ...formatJob(row),
+      ...base,
+      // SEC-AUTHZ-10: redact precise address/coords for non-participants
+      address: isInvolved ? base.address : undefined,
+      location: isInvolved ? base.location : coarsenLocation(base.location),
       customer: {
         firstName: row.customer_first_name,
         lastName: row.customer_last_name,
@@ -350,14 +378,24 @@ export async function updateJobStatus(req: AuthRequest, res: Response): Promise<
     if (status === 'in_progress') extraSet = ', started_at = NOW()';
     if (status === 'completed') extraSet = ', completed_at = NOW()';
 
+    // CQ-JOB-01: guard the UPDATE on the *current* status as well, so two
+    // concurrent transition requests cannot both succeed (which would, e.g.,
+    // double-increment total_jobs_completed). The earlier SELECT is only an
+    // optimistic pre-check; this WHERE makes the transition atomic.
     const result = await query(
       `UPDATE jobs SET status = $1 ${extraSet}
-       WHERE id = $2 AND (customer_id = $3 OR professional_id = $3)
+       WHERE id = $2 AND status = $3 AND (customer_id = $4 OR professional_id = $4)
        RETURNING *,
          ST_Y(location::geometry) as latitude,
          ST_X(location::geometry) as longitude`,
-      [status, id, userId]
+      [status, id, job.status, userId]
     );
+
+    if (result.rows.length === 0) {
+      // Another request changed the status between our read and write.
+      res.status(409).json({ error: 'Job status changed, please refresh and try again' });
+      return;
+    }
 
     if (status === 'completed' && job.professional_id) {
       await query(

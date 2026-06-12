@@ -50,7 +50,9 @@ export function ChatPanel({ jobId, receiverId, receiverName }: ChatPanelProps) {
       socketService.off('new_message', handler);
       socketService.leaveJobRoom(jobId);
     };
-  }, [jobId]);
+    // CQ-UI-03: include user id and receiverId — the handler closes over both,
+    // so the subscription must refresh if either changes (not just jobId).
+  }, [jobId, user?.id, receiverId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

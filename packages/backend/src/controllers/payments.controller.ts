@@ -9,6 +9,7 @@ import {
   createOnboardingLink,
   getAccount,
   createPaymentIntent as stripeCreatePaymentIntent,
+  retrievePaymentIntent,
   constructWebhookEvent,
 } from '../services/stripe.service.js';
 
@@ -142,6 +143,7 @@ export async function createPaymentIntent(req: AuthRequest, res: Response): Prom
       job.customer_email,
       job.stripe_account_id,
       platformFeePence,
+      jobId,
     );
 
     res.json({ clientSecret: intent.client_secret, amount: amountPence });
@@ -159,6 +161,12 @@ export async function confirmPayment(req: AuthRequest, res: Response): Promise<v
 
     if (!UUID_RE.test(jobId)) {
       res.status(400).json({ error: 'Invalid job ID' });
+      return;
+    }
+
+    // PAY-NEW-01: never trust a raw client-supplied id — require the Stripe shape
+    if (typeof paymentIntentId !== 'string' || !/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
+      res.status(400).json({ error: 'Invalid payment reference' });
       return;
     }
 
@@ -182,9 +190,51 @@ export async function confirmPayment(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    // PAY-NEW-04: a job can only be paid once it is completed
+    if (job.status !== 'completed') {
+      res.status(400).json({ error: 'Job must be completed before payment' });
+      return;
+    }
+
+    // PAY-NEW-04: short-circuit if this job has already been paid (avoids
+    // duplicate notifications/emails and re-asserting status)
+    const existing = await query(`SELECT status FROM payments WHERE job_id = $1`, [jobId]);
+    if (existing.rows.length > 0 && existing.rows[0].status === 'succeeded') {
+      res.json({ success: true, alreadyPaid: true });
+      return;
+    }
+
     const amountPence = Math.round(Number(job.estimated_budget) * 100);
     const platformFeePence = Math.round(amountPence * (PLATFORM_FEE_PERCENT / 100));
     const payoutPence = amountPence - platformFeePence;
+
+    // PAY-NEW-01 (CRITICAL): authoritatively verify the charge with Stripe before
+    // recording any 'succeeded' payment. Without this, a client can POST an
+    // arbitrary paymentIntentId and mark a job paid for free.
+    let intent;
+    try {
+      intent = await retrievePaymentIntent(paymentIntentId);
+    } catch {
+      res.status(400).json({ error: 'Payment could not be verified' });
+      return;
+    }
+
+    const intentJobId = intent.metadata?.jobId;
+    const destination =
+      typeof intent.transfer_data?.destination === 'string'
+        ? intent.transfer_data.destination
+        : (intent.transfer_data?.destination as { id?: string } | undefined)?.id;
+
+    if (
+      intent.status !== 'succeeded' ||           // money actually captured
+      intent.amount !== amountPence ||            // exact expected amount
+      intent.currency !== 'gbp' ||                // expected currency
+      intentJobId !== jobId ||                    // bound to THIS job
+      (job.stripe_account_id && destination !== job.stripe_account_id) // paid the right pro
+    ) {
+      res.status(400).json({ error: 'Payment verification failed' });
+      return;
+    }
 
     await query(
       `INSERT INTO payments (job_id, customer_id, professional_id, amount, platform_fee, professional_payout, stripe_payment_intent_id, status)
@@ -313,12 +363,47 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   try {
     if (event.type === 'payment_intent.succeeded') {
-      const intent = event.data.object as { id: string };
-      await query(
+      const intent = event.data.object as {
+        id: string;
+        amount: number;
+        metadata?: { jobId?: string };
+      };
+      // PAY-NEW-02: a captured charge must always leave a DB record. If
+      // confirmPayment never ran (client closed the tab, etc.) the UPDATE would
+      // match nothing — so reconstruct the row from the intent's job metadata.
+      const updated = await query(
         `UPDATE payments SET status = 'succeeded', updated_at = NOW()
-         WHERE stripe_payment_intent_id = $1`,
+         WHERE stripe_payment_intent_id = $1
+         RETURNING id`,
         [intent.id],
       );
+
+      if (updated.rows.length === 0 && intent.metadata?.jobId) {
+        const jobRes = await query(
+          `SELECT customer_id, professional_id, estimated_budget FROM jobs WHERE id = $1`,
+          [intent.metadata.jobId],
+        );
+        if (jobRes.rows.length > 0) {
+          const j = jobRes.rows[0];
+          const amountPence = Math.round(Number(j.estimated_budget) * 100);
+          const platformFeePence = Math.round(amountPence * (PLATFORM_FEE_PERCENT / 100));
+          const payoutPence = amountPence - platformFeePence;
+          await query(
+            `INSERT INTO payments (job_id, customer_id, professional_id, amount, platform_fee, professional_payout, stripe_payment_intent_id, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'succeeded')
+             ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
+            [
+              intent.metadata.jobId,
+              j.customer_id,
+              j.professional_id,
+              Number(j.estimated_budget),
+              +(platformFeePence / 100).toFixed(2),
+              +(payoutPence / 100).toFixed(2),
+              intent.id,
+            ],
+          );
+        }
+      }
     } else if (event.type === 'payment_intent.payment_failed') {
       const intent = event.data.object as { id: string };
       await query(

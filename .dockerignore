@@ -1,0 +1,28 @@
+# Dependencies (reinstalled inside the image)
+**/node_modules
+
+# Build output (rebuilt inside the image)
+**/dist
+
+# Local env & secrets — never bake these into an image
+.env
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Uploaded files (runtime data, mounted as a volume)
+**/uploads
+
+# VCS / tooling / editor noise
+.git
+.gitignore
+**/*.log
+**/.DS_Store
+**/coverage
+**/.vscode
+**/.idea
+
+# Docs & audits — not needed at runtime
+*.md
+*.docx
+SECURITY_AUDIT*.txt

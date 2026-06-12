@@ -16,11 +16,17 @@ export const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  // INFRA-DOS-01: cap any single query so a slow/pathological statement cannot
+  // hold a pooled connection indefinitely and exhaust the pool.
+  statement_timeout: 10000,
+  query_timeout: 10000,
 });
 
+// INFRA-DB-01: a transient error on an *idle* pooled client (e.g. the DB
+// dropped a keep-alive connection) must NOT take down the whole server. The
+// pool will discard the bad client and create a fresh one on the next query.
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle PostgreSQL client', err);
-  process.exit(-1);
+  console.error('Unexpected error on idle PostgreSQL client (connection will be recycled):', err);
 });
 
 export async function query(text: string, params?: unknown[]) {

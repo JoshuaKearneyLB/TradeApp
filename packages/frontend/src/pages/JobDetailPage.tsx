@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { jobService } from '../services/jobService';
 import type { JobResponse } from '../services/jobService';
 import { ratingService } from '../services/ratingService';
@@ -56,6 +57,7 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, logout } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [job, setJob] = useState<JobResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,7 +99,7 @@ export function JobDetailPage() {
       const created = await ratingService.createRating({ jobId: id, rating: ratingValue, comment: ratingComment || undefined });
       setExistingRating(created);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to submit rating');
+      toast.error(err.response?.data?.error || 'Failed to submit rating');
     } finally {
       setRatingLoading(false);
     }
@@ -110,7 +112,7 @@ export function JobDetailPage() {
       await jobService.acceptJob(id);
       fetchJob();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to accept job');
+      toast.error(err.response?.data?.error || 'Failed to accept job');
     } finally {
       setActionLoading(false);
     }
@@ -124,7 +126,7 @@ export function JobDetailPage() {
       await jobService.updateJobStatus(id, status);
       fetchJob();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      toast.error(err.response?.data?.error || 'Failed to update status');
     } finally {
       setActionLoading(false);
     }
@@ -138,7 +140,7 @@ export function JobDetailPage() {
       await jobService.deleteJob(id);
       navigate('/my-jobs');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to remove job');
+      toast.error(err.response?.data?.error || 'Failed to remove job');
     } finally {
       setActionLoading(false);
     }
@@ -151,7 +153,7 @@ export function JobDetailPage() {
       const { clientSecret, amount } = await createPaymentIntent(id);
       setPaymentModal({ clientSecret, amountPence: amount });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to initiate payment');
+      toast.error(err.response?.data?.error || 'Failed to initiate payment');
     } finally {
       setActionLoading(false);
     }

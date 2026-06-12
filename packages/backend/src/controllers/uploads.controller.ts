@@ -47,21 +47,22 @@ export async function uploadJobPhoto(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    // CQ-UPLOAD-01: confirm a file was actually received before doing any work
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
     const job = await verifyParticipant(jobId, userId);
     if (!job) {
-      if (req.file) fs.unlink(req.file.path, () => {});
+      fs.unlink(req.file.path, () => {});
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
 
     if (!UPLOAD_ALLOWED_STATUSES.includes(job.status)) {
-      if (req.file) fs.unlink(req.file.path, () => {});
+      fs.unlink(req.file.path, () => {});
       res.status(400).json({ error: 'Cannot upload photos to a cancelled job' });
-      return;
-    }
-
-    if (!req.file) {
-      res.status(400).json({ error: 'No file uploaded' });
       return;
     }
 
@@ -81,11 +82,22 @@ export async function uploadJobPhoto(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    // FILE-02: Strip EXIF metadata (GPS coordinates, device info, etc.) using sharp
+    // FILE-02 / FILE-12: Strip EXIF (GPS, device info) via sharp. Write to a temp
+    // file, then atomically replace the original. On any failure clean up BOTH
+    // files so no partial/EXIF-bearing artifact is left on disk.
     const cleanPath = req.file.path + '.clean';
-    await sharp(req.file.path).toFile(cleanPath);
-    fs.unlink(req.file.path, () => {}); // remove original with EXIF
-    fs.renameSync(cleanPath, req.file.path); // replace with clean version
+    try {
+      await sharp(req.file.path).toFile(cleanPath);
+      // Remove the EXIF-bearing original first — Windows rename() will not
+      // overwrite an existing target. Safe because no job_photos row references
+      // this file yet, so nothing can request it during the swap.
+      fs.unlinkSync(req.file.path);
+      fs.renameSync(cleanPath, req.file.path);
+    } catch (e) {
+      fs.unlink(cleanPath, () => {});
+      fs.unlink(req.file.path, () => {});
+      throw e;
+    }
 
     const result = await query(
       `INSERT INTO job_photos (job_id, uploaded_by, filename, original_name, photo_type)
@@ -225,12 +237,31 @@ export async function servePhoto(req: AuthRequest, res: Response): Promise<void>
     }
 
     const filePath = path.join(UPLOADS_DIR, filename);
+
+    // FILE-15: defence-in-depth — ensure the resolved path is still inside the
+    // uploads dir even after normalisation (the filename guard above already
+    // blocks separators, but this catches any edge case).
+    if (path.dirname(path.resolve(filePath)) !== path.resolve(UPLOADS_DIR)) {
+      res.status(400).json({ error: 'Invalid filename' });
+      return;
+    }
+
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'Photo not found' });
       return;
     }
 
-    res.sendFile(filePath);
+    // FILE-10: set the Content-Type from the file's actual magic bytes (not its
+    // extension) and forbid MIME sniffing, so a stored file can never be
+    // interpreted as anything other than the image it really is.
+    const detected = await fileTypeFromFile(filePath);
+    const contentType = detected && ALLOWED_MIME.includes(detected.mime)
+      ? detected.mime
+      : 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'inline');
+    res.sendFile(filePath, { headers: { 'Content-Type': contentType } });
   } catch (error) {
     console.error('Serve photo error:', error);
     res.status(500).json({ error: 'Internal server error' });

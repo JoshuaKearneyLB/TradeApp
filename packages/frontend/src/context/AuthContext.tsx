@@ -71,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    authService.logout();
+    // Revoke server-side (async, fire-and-forget) then tear down local state.
+    void authService.logout();
     socketService.disconnect();
     setToken(null);
     setUser(null);
